@@ -148,17 +148,17 @@ export function StatusPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-gray-900 border border-emerald-500/20 rounded-xl p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Online</p>
-          <p className="text-3xl font-bold text-emerald-400">{loading ? '—' : totalOnline}</p>
+          <p className="text-3xl font-bold text-emerald-400">{totalOnline}</p>
           <p className="text-xs text-gray-500 mt-1">agentes ativos</p>
         </div>
         <div className="bg-gray-900 border border-yellow-500/20 rounded-xl p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Ocioso</p>
-          <p className="text-3xl font-bold text-yellow-400">{loading ? '—' : totalIdle}</p>
+          <p className="text-3xl font-bold text-yellow-400">{totalIdle}</p>
           <p className="text-xs text-gray-500 mt-1">aguardando tarefas</p>
         </div>
         <div className="bg-gray-900 border border-red-500/20 rounded-xl p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Offline</p>
-          <p className="text-3xl font-bold text-red-400">{loading ? '—' : totalOffline}</p>
+          <p className="text-3xl font-bold text-red-400">{totalOffline}</p>
           <p className="text-xs text-gray-500 mt-1">sem resposta</p>
         </div>
       </div>
@@ -184,17 +184,10 @@ export function StatusPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {loading && (
+              {agents.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-600 text-sm">
-                    Carregando...
-                  </td>
-                </tr>
-              )}
-              {!loading && agents.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-600 text-sm">
-                    {isConfigured ? 'Nenhum agente encontrado.' : 'Configure o OpenClaw para listar agentes.'}
+                    {loading ? 'Carregando...' : isConfigured ? 'Nenhum agente encontrado.' : 'Configure o OpenClaw para listar agentes.'}
                   </td>
                 </tr>
               )}
@@ -338,17 +331,10 @@ export function StatusPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {loading && (
+              {channels.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-600 text-sm">
-                    Carregando...
-                  </td>
-                </tr>
-              )}
-              {!loading && channels.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-600 text-sm">
-                    {isConfigured ? 'Nenhum canal encontrado.' : 'Configure o OpenClaw para listar canais.'}
+                    {loading ? 'Carregando...' : isConfigured ? 'Nenhum canal encontrado.' : 'Configure o OpenClaw para listar canais.'}
                   </td>
                 </tr>
               )}

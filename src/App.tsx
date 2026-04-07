@@ -8,10 +8,12 @@ import { StatusPage } from './pages/StatusPage';
 import { OrchestrationPage } from './pages/OrchestrationPage';
 import { TelemetryPage } from './pages/TelemetryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SyncStatusProvider } from './context/SyncStatusContext';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <SyncStatusProvider>
       <div className="flex min-h-screen bg-gray-950 text-gray-100">
         <Sidebar />
         <main className="flex-1 overflow-auto">
@@ -23,6 +25,7 @@ export default function App() {
           </Routes>
         </main>
       </div>
+      </SyncStatusProvider>
     </BrowserRouter>
   );
 }

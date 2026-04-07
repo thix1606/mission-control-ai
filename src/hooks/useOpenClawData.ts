@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Agent, Channel, ConfiguredModel, OpenClawConfig } from '../types';
 import { fetchViaWebSocket, updateAgentModel as updateAgentModelRpc } from '../services/openclawWs';
+import { useSyncStatus } from '../context/SyncStatusContext';
 
 interface OpenClawData {
   agents: Agent[];
@@ -29,11 +30,15 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
   const [modelUpdating, setModelUpdating] = useState<string | null>(null);
   const [modelUpdateError, setModelUpdateError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const { setRefreshing, setLastSync } = useSyncStatus();
 
   useEffect(() => {
     if (!config.baseUrl) return;
 
-    setLoading(true);
+    // Primeira carga: loading completo. Recargas subsequentes: só refreshing
+    const isFirstLoad = agents.length === 0 && channels.length === 0;
+    if (isFirstLoad) setLoading(true);
+    setRefreshing(true);
     setError(null);
 
     fetchViaWebSocket(config)
@@ -41,12 +46,16 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
         setAgents(agents);
         setChannels(channels);
         setConfiguredModels(configuredModels);
-        setLoading(false);
+        setLastSync(new Date());
       })
       .catch((err: any) => {
         setError(err?.message ?? 'Erro desconhecido.');
+      })
+      .finally(() => {
         setLoading(false);
+        setRefreshing(false);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.baseUrl, config.token, tick]);
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);

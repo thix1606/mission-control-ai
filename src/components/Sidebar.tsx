@@ -13,7 +13,9 @@ import {
   Bot,
   ChevronRight,
   Settings,
+  RefreshCw,
 } from 'lucide-react';
+import { useSyncStatus } from '../context/SyncStatusContext';
 
 const NAV_ITEMS = [
   {
@@ -37,6 +39,8 @@ const NAV_ITEMS = [
 ];
 
 export function Sidebar() {
+  const { refreshing, lastSync } = useSyncStatus();
+
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-gray-900 border-r border-gray-800 shrink-0">
       {/* Logo / Título */}
@@ -105,6 +109,20 @@ export function Sidebar() {
           </NavLink>
         </div>
       </nav>
+
+      {/* Indicador de sincronização */}
+      <div className="px-6 py-3 border-t border-gray-800/60">
+        {refreshing ? (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
+            <span>Sincronizando...</span>
+          </div>
+        ) : lastSync ? (
+          <p className="text-xs text-gray-700">
+            Atualizado às {lastSync.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+        ) : null}
+      </div>
 
       {/* Rodapé */}
       <div className="px-6 py-4 border-t border-gray-800">
