@@ -353,7 +353,7 @@ const PROVIDER_CATALOG: Record<string, Array<{ id: string; name: string }>> = {
 
 // ── Parsing de modelos configurados ───────────────────────
 
-function parseModels(raw: any): ConfiguredModel[] {
+function parseModels(raw: any, agentModelIds: string[] = []): ConfiguredModel[] {
   console.log('[OpenClaw] models.list raw:', JSON.stringify(raw, null, 2));
 
   // Desembrulha envelopes comuns: { models: [...] }, { list: [...] }, { items: [...] }
@@ -382,8 +382,12 @@ function parseModels(raw: any): ConfiguredModel[] {
     });
   }
 
-  // Identifica providers configurados no OpenClaw
-  const configuredProviders = new Set(rawModels.map((m) => inferProvider(m.id)));
+  // Identifica providers: via models.list + fallback pelos modelos já em uso nos agentes
+  const configuredProviders = new Set([
+    ...rawModels.map((m) => inferProvider(m.id)),
+    ...agentModelIds.map((id) => inferProvider(id)),
+  ]);
+  configuredProviders.delete('outro'); // ignora providers desconhecidos
 
   // Para cada provider, expande com o catálogo completo local
   const expanded: ConfiguredModel[] = [];
@@ -406,6 +410,14 @@ function parseModels(raw: any): ConfiguredModel[] {
     if (!seen.has(m.id)) {
       expanded.push(m);
       seen.add(m.id);
+    }
+  }
+
+  // Mantém modelos dos agentes que não estão em nenhuma outra lista
+  for (const id of agentModelIds) {
+    if (!seen.has(id)) {
+      expanded.push({ id, name: formatModelName(id), provider: inferProvider(id) });
+      seen.add(id);
     }
   }
 
@@ -434,13 +446,19 @@ function formatModelName(modelId: string): string {
 export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   agents: Agent[];
   channels: Channel[];
+  configuredModels: ConfiguredModel[];
 }> {
   return openClawSession(config, async (rpc, on) => {
     let healthResolve: ((p: any) => void) | null = null;
     const healthPromise = new Promise<any>(res => { healthResolve = res; });
     on('health', (payload) => healthResolve?.(payload));
 
-    const configData = await rpc('config.get');
+    // Busca config e modelos em paralelo na mesma sessão autenticada
+    const [configData, modelsRaw] = await Promise.all([
+      rpc('config.get'),
+      rpc('models.list').catch(() => null),
+    ]);
+
     console.log('[OpenClaw] config.get raw:', JSON.stringify(configData, null, 2));
 
     const health = await Promise.race([
@@ -448,15 +466,18 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
       new Promise<null>(res => setTimeout(() => res(null), 5000)),
     ]);
 
-    const cfg = configData?.parsed ?? configData;
-    return { agents: parseAgents(cfg, health), channels: parseChannels(cfg, health) };
-  });
-}
+    const cfg    = configData?.parsed ?? configData;
+    const agents = parseAgents(cfg, health);
 
-export async function fetchConfiguredModels(config: OpenClawConfig): Promise<ConfiguredModel[]> {
-  return openClawSession(config, async (rpc) => {
-    const result = await rpc('models.list');
-    return parseModels(result);
+    // Complementa a detecção de providers com os modelos já em uso pelos agentes
+    const agentModelIds = agents.map((a) => a.model).filter((m) => m !== '—');
+    const configuredModels = parseModels(modelsRaw, agentModelIds);
+
+    return {
+      agents,
+      channels: parseChannels(cfg, health),
+      configuredModels,
+    };
   });
 }
 
@@ -466,10 +487,11 @@ export async function updateAgentModel(
   model: string,
 ): Promise<void> {
   await openClawSession(config, async (rpc) => {
-    // config.patch aplica um merge parcial sobre a configuração atual
     await rpc('config.patch', {
-      agents: {
-        list: [{ id: agentId, model: { primary: model } }],
+      raw: {
+        agents: {
+          list: [{ id: agentId, model: { primary: model } }],
+        },
       },
     });
   });

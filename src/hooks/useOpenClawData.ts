@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { Agent, Channel, ConfiguredModel, OpenClawConfig } from '../types';
-import { fetchViaWebSocket, fetchConfiguredModels, updateAgentModel as updateAgentModelRpc } from '../services/openclawWs';
+import { fetchViaWebSocket, updateAgentModel as updateAgentModelRpc } from '../services/openclawWs';
 
 interface OpenClawData {
   agents: Agent[];
@@ -36,14 +36,11 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
     setLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchViaWebSocket(config),
-      fetchConfiguredModels(config),
-    ])
-      .then(([{ agents, channels }, models]) => {
+    fetchViaWebSocket(config)
+      .then(({ agents, channels, configuredModels }) => {
         setAgents(agents);
         setChannels(channels);
-        setConfiguredModels(models);
+        setConfiguredModels(configuredModels);
         setLoading(false);
       })
       .catch((err: any) => {
