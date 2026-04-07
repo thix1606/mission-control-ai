@@ -108,7 +108,7 @@ export function Sidebar() {
 
       {/* Rodapé */}
       <div className="px-6 py-4 border-t border-gray-800">
-        <p className="text-xs text-gray-600">Mission Control v1.0</p>
+        <p className="text-xs text-gray-600">Mission Control v1.0 <span className="font-mono text-gray-700">{__APP_COMMIT__}</span></p>
         <p className="text-xs text-gray-700">by Thiago Santos</p>
       </div>
     </aside>
