@@ -494,11 +494,11 @@ export async function updateAgentModel(
 ): Promise<void> {
   await openClawSession(config, async (rpc) => {
     await rpc('config.patch', {
-      raw: {
+      raw: JSON.stringify({
         agents: {
           list: [{ id: agentId, model: { primary: model } }],
         },
-      },
+      }),
     });
   });
 }
