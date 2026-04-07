@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { Settings, Eye, EyeOff, Wifi, WifiOff, Save, RotateCcw, Fingerprint, Trash2 } from 'lucide-react';
+import { Settings, Eye, EyeOff, Wifi, WifiOff, Save, RotateCcw, Fingerprint, Trash2, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { testConnection } from '../services/openclaw';
@@ -63,6 +63,19 @@ export function SettingsPage() {
         subtitle="Integração com o servidor OpenClaw"
         icon={<Settings className="w-6 h-6" />}
       />
+
+      {!window.isSecureContext && (
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm">
+          <ShieldAlert className="w-5 h-5 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">HTTPS obrigatório</p>
+            <p className="text-yellow-500/70 mt-0.5">
+              Este app usa criptografia Ed25519 (Web Crypto API) que só funciona em contextos seguros.
+              Acesse via <strong>https://</strong> ou configure um certificado TLS no servidor.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
         <div>

@@ -32,6 +32,12 @@ async function getOrCreateKeyPair(): Promise<{
   publicKeyStr: string;  // base64url, Ed25519 public key (32 bytes)
   deviceId: string;      // SHA-256 hex da chave pública
 }> {
+  if (!window.isSecureContext) {
+    throw new Error(
+      'Contexto inseguro: o app requer HTTPS (ou localhost) para usar criptografia. ' +
+      'Acesse via https:// ou configure um certificado TLS no servidor.',
+    );
+  }
   const storedPub = localStorage.getItem(KEYPAIR_PUB_KEY);
   const storedPrv = localStorage.getItem(KEYPAIR_PRV_KEY);
   const storedId  = localStorage.getItem(DEVICE_ID_KEY);
