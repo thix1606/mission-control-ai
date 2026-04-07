@@ -149,7 +149,6 @@ function parseChannels(cfg: any, health?: any): Channel[] {
   for (const [key, v] of Object.entries(channels)) {
     if (!v || typeof v !== 'object') continue;
     const hc = healthChannels[key] ?? {};
-    console.log(`[OpenClaw] health channel "${key}":`, JSON.stringify(hc, null, 2));
     const channelName = String(labels[key] ?? v.name ?? (key.charAt(0).toUpperCase() + key.slice(1)));
 
     // Coleta todas as contas do canal (health.accounts ou só a raiz)
