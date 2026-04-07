@@ -1,13 +1,13 @@
-name: Deploy Mission Control
+name: Build Mission Control
 
 on:
   push:
     branches: [main]
-  workflow_dispatch: # permite rodar manualmente pelo GitHub
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
@@ -30,30 +30,9 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Configurar chave SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy via rsync
-        run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            dist/ \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/mission-control/
-
-      - name: Reload Nginx
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "sudo systemctl reload nginx"
-
-      - name: Verificar deploy
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "ls -la /var/www/mission-control/ | head -10"
+      - name: Upload artefato de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
