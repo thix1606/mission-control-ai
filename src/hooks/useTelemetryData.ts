@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { OpenClawConfig } from '../types';
 import { fetchTelemetry, type TelemetryData } from '../services/openclawWs';
+export type { TelemetryData };
 
 interface UseTelemetryDataReturn {
   data: TelemetryData | null;
