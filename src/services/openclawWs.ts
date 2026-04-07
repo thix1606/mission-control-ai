@@ -636,8 +636,10 @@ export async function readAgentFile(
   return openClawSession(config, async (rpc) => {
     try {
       const res = await rpc('agents.files.get', { agentId, name: path });
+      console.log(`[agents.files.get] agentId=${agentId} name=${path} →`, JSON.stringify(res));
       return res?.content ?? res?.data ?? null;
-    } catch {
+    } catch (e: any) {
+      console.warn(`[agents.files.get] erro agentId=${agentId} name=${path}:`, e?.message);
       return null;
     }
   });
