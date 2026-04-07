@@ -199,7 +199,10 @@ function parseChannels(cfg: any, health?: any): Channel[] {
         statusDetails,
         account,
         agents:       boundAgents,
-        lastActivity: ac.lastInboundAt ? new Date(ac.lastInboundAt).toLocaleString() : (ac.lastProbeAt ? new Date(ac.lastProbeAt).toLocaleString() : '—'),
+        lastActivity: (() => {
+          const ts = ac.lastInboundAt ?? ac.lastMessageAt ?? ac.lastConnectedAt ?? ac.lastProbeAt ?? null;
+          return ts ? new Date(ts).toLocaleString() : '—';
+        })(),
       });
     }
   }
