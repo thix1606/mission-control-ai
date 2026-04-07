@@ -13,8 +13,8 @@ export const mockTasks: Task[] = [
   {
     id: 'task-001',
     title: 'Processar relatório mensal de vendas',
-    agentId: 'agent-005',
-    agentName: 'Agente de Relatórios',
+    agentId: null,
+    agentName: null,
     priority: 'high',
     createdAt: '2026-04-07T04:00:00Z',
     status: 'queue',

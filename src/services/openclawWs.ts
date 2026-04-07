@@ -508,6 +508,42 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   });
 }
 
+// ── agents.files helpers ───────────────────────────────────
+
+export async function listAgentIds(config: OpenClawConfig): Promise<string[]> {
+  return openClawSession(config, async (rpc) => {
+    const configData = await rpc('config.get');
+    const cfg = configData?.parsed ?? configData;
+    return (cfg?.agents?.list ?? []).map((a: any) => String(a.id));
+  });
+}
+
+export async function readAgentFile(
+  config: OpenClawConfig,
+  agentId: string,
+  path: string,
+): Promise<string | null> {
+  return openClawSession(config, async (rpc) => {
+    try {
+      const res = await rpc('agents.files.get', { agentId, path });
+      return res?.content ?? res?.data ?? null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+export async function writeAgentFile(
+  config: OpenClawConfig,
+  agentId: string,
+  path: string,
+  content: string,
+): Promise<void> {
+  await openClawSession(config, async (rpc) => {
+    await rpc('agents.files.set', { agentId, path, content });
+  });
+}
+
 export async function updateAgentModel(
   config: OpenClawConfig,
   agentId: string,

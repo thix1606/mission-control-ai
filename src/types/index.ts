@@ -38,8 +38,9 @@ export interface Channel {
 export interface Task {
   id: string;
   title: string;
-  agentId: string;
-  agentName: string;
+  description?: string;
+  agentId: string | null;   // null = sem agente atribuído
+  agentName: string | null;
   priority: 'low' | 'medium' | 'high';
   createdAt: string;
   status: TaskStatus;
