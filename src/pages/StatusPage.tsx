@@ -338,21 +338,47 @@ export function StatusPage() {
                   </td>
                 </tr>
               )}
-              {channels.map((channel) => (
-                <tr key={channel.id} className="hover:bg-gray-800/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-white">{channel.name}</td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">{channel.account ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={channel.status} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
-                    {channel.agents.length > 0 ? channel.agents.join(', ') : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-400">
-                    {channel.lastActivity}
-                  </td>
-                </tr>
-              ))}
+              {channels.map((channel) => {
+                const d = channel.statusDetails;
+                const pills: { label: string; active: boolean | undefined }[] = [
+                  { label: 'Configurado', active: d.configured },
+                  { label: 'Em execução', active: d.running },
+                  ...(d.linked    !== undefined ? [{ label: 'Vinculado',  active: d.linked    }] : []),
+                  ...(d.connected !== undefined ? [{ label: 'Conectado',  active: d.connected }] : []),
+                ];
+                return (
+                  <tr key={channel.id} className="hover:bg-gray-800/50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-white">{channel.name}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{channel.account ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      {pills.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {pills.map((p) => (
+                            <span
+                              key={p.label}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                p.active
+                                  ? 'bg-emerald-500/15 text-emerald-400'
+                                  : 'bg-gray-700/60 text-gray-500'
+                              }`}
+                            >
+                              {p.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <StatusBadge status={channel.status} />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      {channel.agents.length > 0 ? channel.agents.join(', ') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-400">
+                      {channel.lastActivity}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

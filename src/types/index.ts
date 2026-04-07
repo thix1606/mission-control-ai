@@ -17,11 +17,19 @@ export interface Agent {
   tasksCompleted: number;
 }
 
+export interface ChannelStatusDetails {
+  configured?: boolean;
+  running?: boolean;
+  connected?: boolean;
+  linked?: boolean;
+}
+
 export interface Channel {
   id: string;
   name: string;
   type: string;
   status: ChannelStatus;
+  statusDetails: ChannelStatusDetails;
   account: string | null; // número/username da conta
   agents: string[];
   lastActivity: string;

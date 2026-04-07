@@ -5,7 +5,7 @@
 // Autenticação: Ed25519 (chave pública 32 bytes, base64url) + token
 // ============================================================
 
-import type { Agent, Channel, ConfiguredModel, OpenClawConfig } from '../types';
+import type { Agent, Channel, ChannelStatusDetails, ConfiguredModel, OpenClawConfig } from '../types';
 
 // ── Armazenamento ──────────────────────────────────────────
 const KEYPAIR_PUB_KEY   = 'mc_openclaw_pub';
@@ -155,6 +155,13 @@ function parseChannels(cfg: any, health?: any): Channel[] {
     const accounts: Record<string, any> = hc.accounts ?? { default: hc };
 
     for (const [accountId, ac] of Object.entries(accounts) as [string, any][]) {
+      const statusDetails: ChannelStatusDetails = {
+        configured: ac.probe?.ok ?? ac.configured ?? undefined,
+        running:    ac.running ?? undefined,
+        connected:  ac.connected ?? undefined,
+        linked:     ac.linked ?? undefined,
+      };
+
       let status: 'online' | 'idle' | 'offline';
       if (ac.running && ac.connected) status = 'online';
       else if (ac.running || ac.linked || ac.probe?.ok) status = 'idle';
@@ -177,6 +184,7 @@ function parseChannels(cfg: any, health?: any): Channel[] {
         name:         channelName,
         type:         String(v.type ?? v.platform ?? 'Mensageria'),
         status,
+        statusDetails,
         account,
         agents:       boundAgents,
         lastActivity: ac.lastInboundAt ? new Date(ac.lastInboundAt).toLocaleString() : (ac.lastProbeAt ? new Date(ac.lastProbeAt).toLocaleString() : '—'),

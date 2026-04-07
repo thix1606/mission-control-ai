@@ -92,6 +92,7 @@ export async function fetchChannels(config: OpenClawConfig): Promise<Channel[]> 
       name: String(c.name ?? c.id),
       type: String(c.type ?? c.platform ?? 'Mensageria'),
       status: mapStatus(c.status),
+      statusDetails: {},
       account: c.account ?? c.username ?? null,
       agents: Array.isArray(c.agents) ? c.agents : [],
       lastActivity: c.lastActivity ?? c.lastInboundAt ?? '—',
