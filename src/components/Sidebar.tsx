@@ -12,6 +12,7 @@ import {
   Activity,
   Bot,
   ChevronRight,
+  Settings,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -80,6 +81,29 @@ export function Sidebar() {
             </NavLink>
           );
         })}
+
+        {/* Configurações — separado no final */}
+        <div className="pt-4 mt-4 border-t border-gray-800">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
+                isActive
+                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`
+            }
+          >
+            <Settings className="w-4 h-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">Configurações</p>
+              <p className="text-xs text-gray-500 truncate group-hover:text-gray-400">
+                OpenClaw & Integrações
+              </p>
+            </div>
+            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </NavLink>
+        </div>
       </nav>
 
       {/* Rodapé */}

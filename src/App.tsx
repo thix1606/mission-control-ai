@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { StatusPage } from './pages/StatusPage';
 import { OrchestrationPage } from './pages/OrchestrationPage';
 import { TelemetryPage } from './pages/TelemetryPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/" element={<StatusPage />} />
             <Route path="/orchestration" element={<OrchestrationPage />} />
             <Route path="/telemetry" element={<TelemetryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>

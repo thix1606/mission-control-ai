@@ -11,6 +11,8 @@ export interface Agent {
   name: string;
   model: string;
   status: AgentStatus;
+  isDefault: boolean;
+  heartbeat: string | null; // ex: "30m" ou null
   lastSeen: string;
   tasksCompleted: number;
 }
@@ -20,7 +22,9 @@ export interface Channel {
   name: string;
   type: string;
   status: ChannelStatus;
-  messagesProcessed: number;
+  account: string | null; // número/username da conta
+  agents: string[];
+  lastActivity: string;
 }
 
 export interface Task {
@@ -48,4 +52,9 @@ export interface WeatherData {
   weatherCode: number;
   windspeed: number;
   city?: string;
+}
+
+export interface OpenClawConfig {
+  baseUrl: string;
+  token: string;
 }
