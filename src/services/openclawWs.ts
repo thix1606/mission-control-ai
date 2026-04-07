@@ -319,9 +319,19 @@ async function openClawSession<T>(
 function parseModels(raw: any): ConfiguredModel[] {
   console.log('[OpenClaw] models.list raw:', JSON.stringify(raw, null, 2));
 
-  // Formato array de objetos: [{ id, name, provider, ... }]
-  if (Array.isArray(raw)) {
-    return raw.map((m: any) => {
+  // Desembrulha envelopes comuns: { models: [...] }, { list: [...] }, { items: [...] }
+  const data: any = Array.isArray(raw)
+    ? raw
+    : (raw?.models ?? raw?.list ?? raw?.items ?? raw);
+
+  // Formato array
+  if (Array.isArray(data)) {
+    return data.map((m: any) => {
+      // Array de strings simples: ["anthropic/claude-sonnet-4-6", ...]
+      if (typeof m === 'string') {
+        return { id: m, name: formatModelName(m), provider: inferProvider(m) };
+      }
+      // Array de objetos: [{ id, name, provider, ... }]
       const id       = String(m.id ?? m.modelId ?? m.model ?? m);
       const provider = String(m.provider ?? inferProvider(id));
       const name     = String(m.name ?? m.displayName ?? formatModelName(id));
@@ -330,8 +340,8 @@ function parseModels(raw: any): ConfiguredModel[] {
   }
 
   // Formato objeto { modelId: { name, provider } }
-  if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([id, v]: [string, any]) => {
+  if (data && typeof data === 'object') {
+    return Object.entries(data).map(([id, v]: [string, any]) => {
       const provider = String(v?.provider ?? inferProvider(id));
       const name     = String(v?.name ?? v?.displayName ?? formatModelName(id));
       return { id, name, provider };
