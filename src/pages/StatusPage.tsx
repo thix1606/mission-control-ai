@@ -5,7 +5,7 @@
 // Configure a URL e o token em: Configurações (/settings)
 // ============================================================
 
-import { LayoutDashboard, Bot, Radio, RefreshCw, AlertTriangle, Settings, Pencil, Check, X, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Bot, Radio, RefreshCw, AlertTriangle, Settings, Pencil, Check, X, Loader2, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../components/StatusBadge';
@@ -48,20 +48,28 @@ export function StatusPage() {
   const totalOffline = agents.filter((a) => a.status === 'offline').length;
 
   // ── Edição inline de modelo ──────────────────────────────
-  const [editingModelId, setEditingModelId] = useState<string | null>(null);
-  const [pendingModel, setPendingModel]     = useState<string>('');
+  const [editingModelId, setEditingModelId]     = useState<string | null>(null);
+  const [pendingModel, setPendingModel]         = useState<string>('');
+  const [confirmingModelId, setConfirmingModelId] = useState<string | null>(null);
 
   function startEdit(agentId: string, currentModel: string) {
     setEditingModelId(agentId);
     setPendingModel(currentModel);
+    setConfirmingModelId(null);
   }
 
   function cancelEdit() {
     setEditingModelId(null);
     setPendingModel('');
+    setConfirmingModelId(null);
+  }
+
+  function requestConfirm(agentId: string) {
+    setConfirmingModelId(agentId);
   }
 
   async function confirmEdit(agentId: string) {
+    setConfirmingModelId(null);
     setEditingModelId(null);
     await updateAgentModel(agentId, pendingModel);
     setPendingModel('');
@@ -210,51 +218,77 @@ export function StatusPage() {
                           {agent.model}
                         </span>
                       ) : editingModelId === agent.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            autoFocus
-                            value={pendingModel}
-                            onChange={(e) => setPendingModel(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') confirmEdit(agent.id);
-                              if (e.key === 'Escape') cancelEdit();
-                            }}
-                            className="bg-gray-800 border border-indigo-500/60 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-indigo-400"
-                            disabled={configuredModels.length === 0}
-                          >
-                            {configuredModels.length === 0 ? (
-                              <option value={agent.model}>{agent.model} (sem modelos configurados)</option>
-                            ) : (
-                              <>
-                                {modelGroups.map(([provider, models]) => (
-                                  <optgroup key={provider} label={provider.charAt(0).toUpperCase() + provider.slice(1)}>
-                                    {models.map((m) => (
-                                      <option key={m.id} value={m.id}>{m.name}</option>
-                                    ))}
-                                  </optgroup>
-                                ))}
-                                {/* Modelo atual do agente caso não esteja no catálogo */}
-                                {!configuredModelIds.includes(pendingModel) && (
-                                  <option value={pendingModel}>{pendingModel}</option>
-                                )}
-                              </>
-                            )}
-                          </select>
-                          <button
-                            onClick={() => confirmEdit(agent.id)}
-                            className="p-1 rounded text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-                            title="Confirmar"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="p-1 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors"
-                            title="Cancelar"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        confirmingModelId === agent.id ? (
+                          /* ── Confirmação de reinício ── */
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-1.5 text-yellow-400 text-xs">
+                              <RotateCcw className="w-3 h-3 shrink-0" />
+                              <span>Trocar o modelo reiniciará o gateway. Confirmar?</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => confirmEdit(agent.id)}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/30 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                                Confirmar
+                              </button>
+                              <button
+                                onClick={() => setConfirmingModelId(null)}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                                Voltar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* ── Seleção de modelo ── */
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              autoFocus
+                              value={pendingModel}
+                              onChange={(e) => setPendingModel(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') requestConfirm(agent.id);
+                                if (e.key === 'Escape') cancelEdit();
+                              }}
+                              className="bg-gray-800 border border-indigo-500/60 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-indigo-400"
+                              disabled={configuredModels.length === 0}
+                            >
+                              {configuredModels.length === 0 ? (
+                                <option value={agent.model}>{agent.model} (sem modelos configurados)</option>
+                              ) : (
+                                <>
+                                  {modelGroups.map(([provider, models]) => (
+                                    <optgroup key={provider} label={provider.charAt(0).toUpperCase() + provider.slice(1)}>
+                                      {models.map((m) => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
+                                  {!configuredModelIds.includes(pendingModel) && (
+                                    <option value={pendingModel}>{pendingModel}</option>
+                                  )}
+                                </>
+                              )}
+                            </select>
+                            <button
+                              onClick={() => requestConfirm(agent.id)}
+                              className="p-1 rounded text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                              title="Confirmar"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="p-1 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors"
+                              title="Cancelar"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <button
                           onClick={() => startEdit(agent.id, agent.model)}
