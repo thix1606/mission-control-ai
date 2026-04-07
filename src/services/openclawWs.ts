@@ -635,11 +635,9 @@ export async function readAgentFile(
 ): Promise<string | null> {
   return openClawSession(config, async (rpc) => {
     try {
-      const res = await rpc('agents.files.get', { agentId, path });
-      console.log(`[agents.files.get] agentId=${agentId} path=${path} →`, JSON.stringify(res));
+      const res = await rpc('agents.files.get', { agentId, name: path });
       return res?.content ?? res?.data ?? null;
-    } catch (e: any) {
-      console.warn(`[agents.files.get] erro agentId=${agentId} path=${path}:`, e?.message);
+    } catch {
       return null;
     }
   });
@@ -652,7 +650,7 @@ export async function writeAgentFile(
   content: string,
 ): Promise<void> {
   await openClawSession(config, async (rpc) => {
-    await rpc('agents.files.set', { agentId, path, content });
+    await rpc('agents.files.set', { agentId, name: path, content });
   });
 }
 
