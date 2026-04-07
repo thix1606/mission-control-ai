@@ -200,7 +200,7 @@ function parseChannels(cfg: any, health?: any): Channel[] {
         account,
         agents:       boundAgents,
         lastActivity: (() => {
-          const ts = ac.lastInboundAt ?? ac.lastMessageAt ?? ac.lastConnectedAt ?? ac.lastProbeAt ?? null;
+          const ts = [ac.lastInboundAt, ac.lastMessageAt, ac.lastConnectedAt, ac.lastProbeAt].find(v => v != null) ?? null;
           return ts ? new Date(ts).toLocaleString() : '—';
         })(),
       });
