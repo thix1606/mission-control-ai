@@ -155,22 +155,28 @@ function parseChannels(cfg: any, health?: any): Channel[] {
     const accounts: Record<string, any> = hc.accounts ?? { default: hc };
 
     for (const [accountId, ac] of Object.entries(accounts) as [string, any][]) {
-      // Alguns campos ficam no nível do canal (hc) e não no sub-objeto de conta (ac)
-      const running   = ac.running   ?? hc.running   ?? undefined;
-      const connected = ac.connected ?? hc.connected ?? undefined;
-      const linked    = ac.linked    ?? hc.linked    ?? undefined;
-      const probeOk   = ac.probe?.ok ?? hc.probe?.ok ?? undefined;
+      // Campos brutos — podem estar no sub-objeto de conta (ac) ou no nível do canal (hc)
+      const rawRunning   = ac.running   ?? hc.running   ?? false;
+      const rawConnected = ac.connected ?? hc.connected ?? false;
+      const linked       = ac.linked    ?? hc.linked    ?? undefined;
+      const probeOk      = ac.probe?.ok ?? hc.probe?.ok ?? undefined;
+      const configured   = ac.configured ?? hc.configured ?? undefined;
+
+      // O OpenClaw deriva "em execução" de probe.ok (Telegram) ou linked (WhatsApp)
+      const effectiveRunning   = rawRunning || probeOk || linked || false;
+      // "conectado" para WhatsApp = linked (sessão autenticada = conectado)
+      const effectiveConnected = rawConnected || linked || undefined;
 
       const statusDetails: ChannelStatusDetails = {
-        configured: probeOk ?? ac.configured ?? hc.configured ?? undefined,
-        running,
-        connected,
-        linked,
+        configured,
+        running:   effectiveRunning   !== false ? effectiveRunning   : undefined,
+        connected: effectiveConnected !== undefined ? effectiveConnected : undefined,
+        linked:    linked             !== undefined ? linked             : undefined,
       };
 
       let status: 'online' | 'idle' | 'offline';
-      if (running && connected) status = 'online';
-      else if (running || linked || probeOk) status = 'idle';
+      if (effectiveRunning && effectiveConnected) status = 'online';
+      else if (effectiveRunning || linked || probeOk) status = 'idle';
       else status = 'offline';
 
       const account: string | null =
@@ -469,10 +475,7 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   return openClawSession(config, async (rpc, on) => {
     let healthResolve: ((p: any) => void) | null = null;
     const healthPromise = new Promise<any>(res => { healthResolve = res; });
-    on('health', (payload) => {
-      console.log('[OpenClaw] health event payload:', JSON.stringify(payload, null, 2));
-      healthResolve?.(payload);
-    });
+    on('health', (payload) => healthResolve?.(payload));
 
     // Busca config e modelos em paralelo na mesma sessão autenticada
     const [configData, modelsRaw] = await Promise.all([
