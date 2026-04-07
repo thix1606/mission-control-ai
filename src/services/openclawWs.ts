@@ -314,6 +314,43 @@ async function openClawSession<T>(
   });
 }
 
+// ── Catálogo local completo por provider ──────────────────
+// Expandido quando o provider está configurado no OpenClaw.
+
+const PROVIDER_CATALOG: Record<string, Array<{ id: string; name: string }>> = {
+  anthropic: [
+    { id: 'anthropic/claude-opus-4-6',     name: 'Claude Opus 4.6' },
+    { id: 'anthropic/claude-sonnet-4-6',   name: 'Claude Sonnet 4.6' },
+    { id: 'anthropic/claude-haiku-4-5',    name: 'Claude Haiku 4.5' },
+    { id: 'anthropic/claude-opus-4-5',     name: 'Claude Opus 4.5' },
+    { id: 'anthropic/claude-sonnet-4-5',   name: 'Claude Sonnet 4.5' },
+  ],
+  openai: [
+    { id: 'openai/gpt-4o',       name: 'GPT-4o' },
+    { id: 'openai/gpt-4o-mini',  name: 'GPT-4o Mini' },
+    { id: 'openai/gpt-4-turbo',  name: 'GPT-4 Turbo' },
+    { id: 'openai/o3',           name: 'o3' },
+    { id: 'openai/o4-mini',      name: 'o4-mini' },
+  ],
+  google: [
+    { id: 'google/gemini-2.5-pro',        name: 'Gemini 2.5 Pro' },
+    { id: 'google/gemini-2.5-flash',      name: 'Gemini 2.5 Flash' },
+    { id: 'google/gemini-2.0-flash',      name: 'Gemini 2.0 Flash' },
+    { id: 'google/gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
+    { id: 'google/gemini-1.5-pro',        name: 'Gemini 1.5 Pro' },
+    { id: 'google/gemini-1.5-flash',      name: 'Gemini 1.5 Flash' },
+  ],
+  meta: [
+    { id: 'meta/llama-3.3-70b', name: 'Llama 3.3 70B' },
+    { id: 'meta/llama-3.1-8b',  name: 'Llama 3.1 8B' },
+  ],
+  mistral: [
+    { id: 'mistral/mistral-large', name: 'Mistral Large' },
+    { id: 'mistral/mistral-small', name: 'Mistral Small' },
+    { id: 'mistral/codestral',     name: 'Codestral' },
+  ],
+};
+
 // ── Parsing de modelos configurados ───────────────────────
 
 function parseModels(raw: any): ConfiguredModel[] {
@@ -324,31 +361,55 @@ function parseModels(raw: any): ConfiguredModel[] {
     ? raw
     : (raw?.models ?? raw?.list ?? raw?.items ?? raw);
 
-  // Formato array
+  // Extrai modelos brutos do OpenClaw
+  let rawModels: ConfiguredModel[] = [];
+
   if (Array.isArray(data)) {
-    return data.map((m: any) => {
-      // Array de strings simples: ["anthropic/claude-sonnet-4-6", ...]
+    rawModels = data.map((m: any) => {
       if (typeof m === 'string') {
         return { id: m, name: formatModelName(m), provider: inferProvider(m) };
       }
-      // Array de objetos: [{ id, name, provider, ... }]
       const id       = String(m.id ?? m.modelId ?? m.model ?? m);
       const provider = String(m.provider ?? inferProvider(id));
       const name     = String(m.name ?? m.displayName ?? formatModelName(id));
       return { id, name, provider };
     });
-  }
-
-  // Formato objeto { modelId: { name, provider } }
-  if (data && typeof data === 'object') {
-    return Object.entries(data).map(([id, v]: [string, any]) => {
+  } else if (data && typeof data === 'object') {
+    rawModels = Object.entries(data).map(([id, v]: [string, any]) => {
       const provider = String(v?.provider ?? inferProvider(id));
       const name     = String(v?.name ?? v?.displayName ?? formatModelName(id));
       return { id, name, provider };
     });
   }
 
-  return [];
+  // Identifica providers configurados no OpenClaw
+  const configuredProviders = new Set(rawModels.map((m) => inferProvider(m.id)));
+
+  // Para cada provider, expande com o catálogo completo local
+  const expanded: ConfiguredModel[] = [];
+  const seen = new Set<string>();
+
+  for (const provider of configuredProviders) {
+    const catalog = PROVIDER_CATALOG[provider];
+    if (catalog) {
+      for (const entry of catalog) {
+        if (!seen.has(entry.id)) {
+          expanded.push({ ...entry, provider });
+          seen.add(entry.id);
+        }
+      }
+    }
+  }
+
+  // Mantém modelos do OpenClaw que não estão no catálogo local (ex: modelos customizados)
+  for (const m of rawModels) {
+    if (!seen.has(m.id)) {
+      expanded.push(m);
+      seen.add(m.id);
+    }
+  }
+
+  return expanded;
 }
 
 function inferProvider(modelId: string): string {
