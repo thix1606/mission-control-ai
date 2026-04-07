@@ -508,6 +508,91 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   });
 }
 
+// ── Telemetria ─────────────────────────────────────────────
+
+export interface ModelUsage {
+  id: string;
+  name: string;
+  provider: string;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensTotal: number;
+  costUSD: number;
+  requests: number;
+}
+
+export interface TelemetryData {
+  models: ModelUsage[];
+  totalCostUSD: number;
+  totalRequests: number;
+  quotas: { provider: string; used: number; limit: number | null; remaining: number | null }[];
+}
+
+export async function fetchTelemetry(config: OpenClawConfig): Promise<TelemetryData> {
+  return openClawSession(config, async (rpc) => {
+    const now   = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const end   = now.toISOString();
+
+    const [costRaw, statusRaw] = await Promise.all([
+      rpc('usage.cost',   { from: start, to: end }).catch(() => null),
+      rpc('usage.status', {}).catch(() => null),
+    ]);
+
+    console.log('[OpenClaw] usage.cost:', JSON.stringify(costRaw, null, 2));
+    console.log('[OpenClaw] usage.status:', JSON.stringify(statusRaw, null, 2));
+
+    return parseTelemetry(costRaw, statusRaw);
+  });
+}
+
+function parseTelemetry(costRaw: any, statusRaw: any): TelemetryData {
+  const models: ModelUsage[] = [];
+
+  // usage.cost pode vir como array ou objeto keyed por modelo/provider
+  const costItems: any[] = Array.isArray(costRaw)
+    ? costRaw
+    : Array.isArray(costRaw?.items) ? costRaw.items
+    : Array.isArray(costRaw?.data)  ? costRaw.data
+    : Object.entries(costRaw ?? {}).map(([k, v]) => ({ model: k, ...(typeof v === 'object' ? v : { costUSD: v }) }));
+
+  for (const item of costItems) {
+    const modelId = item.model ?? item.modelId ?? item.id ?? 'unknown';
+    const provider = item.provider ?? inferProvider(modelId);
+    models.push({
+      id:           modelId,
+      name:         item.name ?? formatModelName(modelId),
+      provider:     provider.charAt(0).toUpperCase() + provider.slice(1),
+      tokensInput:  item.tokensInput  ?? item.inputTokens  ?? 0,
+      tokensOutput: item.tokensOutput ?? item.outputTokens ?? 0,
+      tokensTotal:  item.tokensTotal  ?? item.tokens       ?? (item.tokensInput ?? 0) + (item.tokensOutput ?? 0),
+      costUSD:      item.costUSD ?? item.cost ?? item.totalCost ?? 0,
+      requests:     item.requests ?? item.count ?? item.calls ?? 0,
+    });
+  }
+
+  // quotas do usage.status
+  const quotas: TelemetryData['quotas'] = [];
+  const statusItems: any[] = Array.isArray(statusRaw) ? statusRaw
+    : Array.isArray(statusRaw?.providers) ? statusRaw.providers
+    : Array.isArray(statusRaw?.items)     ? statusRaw.items
+    : Object.entries(statusRaw ?? {}).map(([k, v]) => ({ provider: k, ...(typeof v === 'object' ? v : {}) }));
+
+  for (const s of statusItems) {
+    quotas.push({
+      provider:  s.provider ?? s.name ?? '—',
+      used:      s.used ?? s.tokensUsed ?? 0,
+      limit:     s.limit ?? s.tokensLimit ?? null,
+      remaining: s.remaining ?? s.tokensRemaining ?? null,
+    });
+  }
+
+  const totalCostUSD    = models.reduce((acc, m) => acc + m.costUSD, 0);
+  const totalRequests   = models.reduce((acc, m) => acc + m.requests, 0);
+
+  return { models, totalCostUSD, totalRequests, quotas };
+}
+
 // ── agents.files helpers ───────────────────────────────────
 
 export async function listAgentIds(config: OpenClawConfig): Promise<string[]> {
