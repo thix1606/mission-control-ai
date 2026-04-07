@@ -360,8 +360,6 @@ const PROVIDER_CATALOG: Record<string, Array<{ id: string; name: string }>> = {
 // ── Parsing de modelos configurados ───────────────────────
 
 function parseModels(raw: any, agentModelIds: string[] = []): ConfiguredModel[] {
-  console.log('[OpenClaw] models.list raw:', JSON.stringify(raw, null, 2));
-
   // Desembrulha envelopes comuns: { models: [...] }, { list: [...] }, { items: [...] }
   const data: any = Array.isArray(raw)
     ? raw
@@ -464,8 +462,6 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
       rpc('config.get'),
       rpc('models.list').catch(() => null),
     ]);
-
-    console.log('[OpenClaw] config.get raw:', JSON.stringify(configData, null, 2));
 
     const health = await Promise.race([
       healthPromise,
