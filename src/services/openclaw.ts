@@ -53,6 +53,8 @@ export async function fetchAgents(config: OpenClawConfig): Promise<Agent[]> {
     name: String(m.id).replace(/^openclaw\/?/, '') || String(m.id),
     model: String(m.id),
     status: mapStatus(m.status),
+    isDefault: m.isDefault ?? false,
+    heartbeat: m.heartbeat ?? null,
     lastSeen: m.created
       ? new Date(m.created * 1000).toLocaleString('pt-BR')
       : '—',
@@ -90,8 +92,9 @@ export async function fetchChannels(config: OpenClawConfig): Promise<Channel[]> 
       name: String(c.name ?? c.id),
       type: String(c.type ?? c.platform ?? 'Mensageria'),
       status: mapStatus(c.status),
-      messagesProcessed:
-        c.messagesProcessed ?? c.messages_processed ?? c.messageCount ?? 0,
+      account: c.account ?? c.username ?? null,
+      agents: Array.isArray(c.agents) ? c.agents : [],
+      lastActivity: c.lastActivity ?? c.lastInboundAt ?? '—',
     }));
   }
 
