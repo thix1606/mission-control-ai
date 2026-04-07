@@ -536,11 +536,15 @@ export async function fetchTelemetry(config: OpenClawConfig): Promise<TelemetryD
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
     const end   = now.toISOString();
 
-    const [costRaw, sessionsRaw] = await Promise.all([
-      rpc('usage.cost',    { from: start, to: end }).catch(() => null),
-      rpc('sessions.usage', { from: start, to: end }).catch(() => null),
+    const [costRaw, s1, s2, s3] = await Promise.all([
+      rpc('usage.cost',     { from: start, to: end }).catch(() => null),
+      rpc('sessions.usage', {}).catch(() => null),
+      rpc('sessions.usage', { limit: 100 }).catch(() => null),
+      rpc('usage.cost',     { from: start, to: end, groupBy: 'model' }).catch(() => null),
     ]);
-    console.log('[OpenClaw] sessions.usage:', JSON.stringify(sessionsRaw, null, 2));
+    console.log('[OpenClaw] sessions.usage {}:', JSON.stringify(s1, null, 2));
+    console.log('[OpenClaw] sessions.usage {limit}:', JSON.stringify(s2, null, 2));
+    console.log('[OpenClaw] usage.cost groupBy model:', JSON.stringify(s3, null, 2));
     return parseTelemetry(costRaw);
   });
 }
