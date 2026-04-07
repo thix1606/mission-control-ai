@@ -6,11 +6,12 @@
 // Relógio: calculado em tempo real (sem API)
 // ============================================================
 
-import { Activity, AlertTriangle, Clock, Cloud, Cpu } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Cloud, Cpu, TrendingUp } from 'lucide-react';
 import { useWeather } from '../hooks/useWeather';
 import { useClock } from '../hooks/useClock';
 import { useTelemetryData } from '../hooks/useTelemetryData';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
+import { useRates } from '../hooks/useRates';
 import { PageHeader } from '../components/PageHeader';
 
 function fmt(n: number) {
@@ -34,10 +35,18 @@ export function TelemetryPage() {
   const { time, date } = useClock();
   const { config } = useOpenClawConfig();
   const { data, loading: telLoading, error: telError } = useTelemetryData(config);
+  const { rates } = useRates(config);
 
-  const totals = data?.totals;
-  const daily  = data?.daily ?? [];
+  const usdToBrl = rates?.USDBRL ?? null;
+
+  const totals  = data?.totals;
+  const daily   = data?.daily ?? [];
   const maxCost = daily.length > 0 ? Math.max(...daily.map((d) => d.costUSD)) : 1;
+
+  function brl(usd: number) {
+    if (!usdToBrl) return null;
+    return (usd * usdToBrl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
 
   return (
     <div className="p-8">
@@ -87,6 +96,35 @@ export function TelemetryPage() {
         </div>
       )}
 
+      {/* Cotações do dia */}
+      {rates && (
+        <div className="mb-6 p-3 rounded-xl bg-gray-900 border border-gray-800">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-xs text-gray-500 uppercase tracking-wider">
+              Cotações · {new Date(rates.updatedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'USD / BRL', value: rates.USDBRL },
+              { label: 'EUR / BRL', value: rates.EURBRL },
+              { label: 'BTC / BRL', value: rates.BTCBRL, large: true },
+              { label: 'ETH / BRL', value: rates.ETHBRL, large: true },
+            ].map(({ label, value, large }) => (
+              <div key={label} className="bg-gray-800/60 rounded-lg px-3 py-2">
+                <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+                <p className="text-sm font-bold text-white font-mono">
+                  {large
+                    ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+                    : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Cards de totais */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -94,6 +132,9 @@ export function TelemetryPage() {
           <p className="text-2xl font-bold text-white">
             {telLoading ? '—' : `$${(totals?.costUSD ?? 0).toFixed(2)}`}
           </p>
+          {brl(totals?.costUSD ?? 0) && (
+            <p className="text-xs text-indigo-400 mt-0.5">{brl(totals?.costUSD ?? 0)}</p>
+          )}
           <p className="text-xs text-gray-600 mt-1">USD · últimos 31 dias</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -162,8 +203,11 @@ export function TelemetryPage() {
                   <td className="px-4 py-3 text-right text-indigo-400 text-xs">{fmt(d.cacheRead)}</td>
                   <td className="px-4 py-3 text-right text-gray-300 text-xs font-medium">{fmt(d.tokensTotal)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-between text-xs mb-0.5">
+                    <div className="text-xs mb-0.5">
                       <span className="text-white font-semibold">${d.costUSD.toFixed(4)}</span>
+                      {brl(d.costUSD) && (
+                        <span className="text-indigo-400 ml-1.5">{brl(d.costUSD)}</span>
+                      )}
                     </div>
                     <CostBar value={d.costUSD} max={maxCost} />
                   </td>
