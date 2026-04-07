@@ -6,7 +6,7 @@
 // Relógio: calculado em tempo real (sem API)
 // ============================================================
 
-import { Activity, AlertTriangle, Clock, Cloud, Cpu, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Cloud, Cpu, Database, TrendingUp } from 'lucide-react';
 import { useWeather } from '../hooks/useWeather';
 import { useClock } from '../hooks/useClock';
 import { useTelemetryData } from '../hooks/useTelemetryData';
@@ -39,9 +39,30 @@ export function TelemetryPage() {
 
   const usdToBrl = rates?.USDBRL ?? null;
 
-  const totals  = data?.totals;
-  const daily   = data?.daily ?? [];
-  const maxCost = daily.length > 0 ? Math.max(...daily.map((d) => d.costUSD)) : 1;
+  const totals     = data?.totals;
+  const daily      = data?.daily ?? [];
+  const modelUsage = data?.modelUsage ?? [];
+  const maxCost    = daily.length > 0 ? Math.max(...daily.map((d) => d.costUSD)) : 1;
+  const maxModelCost = modelUsage.length > 0 ? Math.max(...modelUsage.map((m) => m.costUSD)) : 1;
+
+  const PROVIDER_COLORS: Record<string, string> = {
+    anthropic: 'text-orange-400',
+    openai:    'text-green-400',
+    google:    'text-blue-400',
+    meta:      'text-sky-400',
+    mistral:   'text-purple-400',
+  };
+
+  function providerLabel(provider: string) {
+    const map: Record<string, string> = {
+      anthropic: 'Anthropic',
+      openai:    'OpenAI',
+      google:    'Google',
+      meta:      'Meta',
+      mistral:   'Mistral',
+    };
+    return map[provider] ?? provider;
+  }
 
   function brl(usd: number) {
     if (!usdToBrl) return null;
@@ -159,6 +180,69 @@ export function TelemetryPage() {
           <p className="text-xs text-gray-600 mt-1">tokens economizados</p>
         </div>
       </div>
+
+      {/* Consumo por modelo */}
+      {(telLoading || modelUsage.length > 0) && (
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Database className="w-4 h-4 text-indigo-400" />
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
+              Consumo por Modelo
+            </h2>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="text-left px-4 py-3">Modelo</th>
+                  <th className="text-right px-4 py-3">Chamadas</th>
+                  <th className="text-right px-4 py-3">Tokens totais</th>
+                  <th className="text-right px-4 py-3">Cache lido</th>
+                  <th className="text-left px-4 py-3 w-44">Custo (USD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {telLoading && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-600 text-sm">
+                      Carregando...
+                    </td>
+                  </tr>
+                )}
+                {!telLoading && modelUsage.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-600 text-sm">
+                      Nenhum dado de modelo disponível.
+                    </td>
+                  </tr>
+                )}
+                {modelUsage.map((m) => (
+                  <tr key={`${m.provider}:${m.model}`} className="hover:bg-gray-800/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold uppercase tracking-wider ${PROVIDER_COLORS[m.provider] ?? 'text-gray-500'} mr-2`}>
+                        {providerLabel(m.provider)}
+                      </span>
+                      <span className="text-sm text-gray-200 font-mono">{m.model}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-400 text-xs">{m.calls.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right text-gray-300 text-xs font-medium">{fmt(m.tokensTotal)}</td>
+                    <td className="px-4 py-3 text-right text-indigo-400 text-xs">{fmt(m.cacheRead)}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs mb-0.5">
+                        <span className="text-white font-semibold">${m.costUSD.toFixed(4)}</span>
+                        {brl(m.costUSD) && (
+                          <span className="text-indigo-400 ml-1.5">{brl(m.costUSD)}</span>
+                        )}
+                      </div>
+                      <CostBar value={m.costUSD} max={maxModelCost} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Tabela de consumo diário */}
       <section>

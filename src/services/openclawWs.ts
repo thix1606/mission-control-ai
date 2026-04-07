@@ -519,6 +519,17 @@ export interface DailyUsage {
   costUSD: number;
 }
 
+export interface ModelUsage {
+  provider: string;
+  model: string;
+  calls: number;
+  tokensInput: number;
+  tokensOutput: number;
+  cacheRead: number;
+  tokensTotal: number;
+  costUSD: number;
+}
+
 export interface TelemetryData {
   daily: DailyUsage[];
   totals: {
@@ -528,6 +539,7 @@ export interface TelemetryData {
     tokensTotal: number;
     costUSD: number;
   };
+  modelUsage: ModelUsage[];
 }
 
 export async function fetchTelemetry(config: OpenClawConfig): Promise<TelemetryData> {
@@ -536,20 +548,16 @@ export async function fetchTelemetry(config: OpenClawConfig): Promise<TelemetryD
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
     const end   = now.toISOString();
 
-    const [costRaw, s1, s2, s3] = await Promise.all([
+    const [costRaw, sessionsRaw] = await Promise.all([
       rpc('usage.cost',     { from: start, to: end }).catch(() => null),
       rpc('sessions.usage', {}).catch(() => null),
-      rpc('sessions.usage', { limit: 100 }).catch(() => null),
-      rpc('usage.cost',     { from: start, to: end, groupBy: 'model' }).catch(() => null),
     ]);
-    console.log('[OpenClaw] sessions.usage {}:', JSON.stringify(s1, null, 2));
-    console.log('[OpenClaw] sessions.usage {limit}:', JSON.stringify(s2, null, 2));
-    console.log('[OpenClaw] usage.cost groupBy model:', JSON.stringify(s3, null, 2));
-    return parseTelemetry(costRaw);
+
+    return parseTelemetry(costRaw, sessionsRaw);
   });
 }
 
-function parseTelemetry(costRaw: any): TelemetryData {
+function parseTelemetry(costRaw: any, sessionsRaw?: any): TelemetryData {
   const dailyRaw: any[] = Array.isArray(costRaw?.daily) ? costRaw.daily : [];
 
   const daily: DailyUsage[] = dailyRaw.map((d) => ({
@@ -562,6 +570,41 @@ function parseTelemetry(costRaw: any): TelemetryData {
   })).sort((a, b) => b.date.localeCompare(a.date)); // mais recente primeiro
 
   const t = costRaw?.totals ?? {};
+
+  // Agrega modelUsage de todas as sessões por chave provider:model
+  const modelMap = new Map<string, ModelUsage>();
+  const sessions: any[] = Array.isArray(sessionsRaw?.sessions) ? sessionsRaw.sessions : [];
+  for (const session of sessions) {
+    const modelUsageArr: any[] = Array.isArray(session.usage?.modelUsage) ? session.usage.modelUsage : [];
+    for (const mu of modelUsageArr) {
+      const key = `${mu.provider ?? ''}:${mu.model ?? ''}`;
+      const existing = modelMap.get(key);
+      const tot = mu.totals ?? {};
+      if (existing) {
+        existing.calls        += mu.count         ?? 0;
+        existing.tokensInput  += tot.input        ?? 0;
+        existing.tokensOutput += tot.output       ?? 0;
+        existing.cacheRead    += tot.cacheRead    ?? 0;
+        existing.tokensTotal  += tot.totalTokens  ?? 0;
+        existing.costUSD      += tot.totalCost    ?? 0;
+      } else {
+        modelMap.set(key, {
+          provider:     String(mu.provider ?? 'outro'),
+          model:        String(mu.model    ?? 'desconhecido'),
+          calls:        mu.count         ?? 0,
+          tokensInput:  tot.input        ?? 0,
+          tokensOutput: tot.output       ?? 0,
+          cacheRead:    tot.cacheRead    ?? 0,
+          tokensTotal:  tot.totalTokens  ?? 0,
+          costUSD:      tot.totalCost    ?? 0,
+        });
+      }
+    }
+  }
+
+  const modelUsage = Array.from(modelMap.values())
+    .sort((a, b) => b.costUSD - a.costUSD);
+
   return {
     daily,
     totals: {
@@ -571,6 +614,7 @@ function parseTelemetry(costRaw: any): TelemetryData {
       tokensTotal:  t.totalTokens ?? 0,
       costUSD:      t.totalCost   ?? 0,
     },
+    modelUsage,
   };
 }
 
