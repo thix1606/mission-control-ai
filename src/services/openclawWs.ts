@@ -155,16 +155,22 @@ function parseChannels(cfg: any, health?: any): Channel[] {
     const accounts: Record<string, any> = hc.accounts ?? { default: hc };
 
     for (const [accountId, ac] of Object.entries(accounts) as [string, any][]) {
+      // Alguns campos ficam no nível do canal (hc) e não no sub-objeto de conta (ac)
+      const running   = ac.running   ?? hc.running   ?? undefined;
+      const connected = ac.connected ?? hc.connected ?? undefined;
+      const linked    = ac.linked    ?? hc.linked    ?? undefined;
+      const probeOk   = ac.probe?.ok ?? hc.probe?.ok ?? undefined;
+
       const statusDetails: ChannelStatusDetails = {
-        configured: ac.probe?.ok ?? ac.configured ?? undefined,
-        running:    ac.running ?? undefined,
-        connected:  ac.connected ?? undefined,
-        linked:     ac.linked ?? undefined,
+        configured: probeOk ?? ac.configured ?? hc.configured ?? undefined,
+        running,
+        connected,
+        linked,
       };
 
       let status: 'online' | 'idle' | 'offline';
-      if (ac.running && ac.connected) status = 'online';
-      else if (ac.running || ac.linked || ac.probe?.ok) status = 'idle';
+      if (running && connected) status = 'online';
+      else if (running || linked || probeOk) status = 'idle';
       else status = 'offline';
 
       const account: string | null =
