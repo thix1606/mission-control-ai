@@ -28,8 +28,11 @@ export function useRates(config: OpenClawConfig): { rates: Rates | null; loading
     (async () => {
       try {
         const agentIds = await listAgentIds(config);
+        console.log('[rates] agentIds encontrados:', agentIds);
         for (const agentId of agentIds) {
+          console.log(`[rates] tentando agents.files.get { agentId: '${agentId}', path: 'rates.json' }`);
           const content = await readAgentFile(config, agentId, 'rates.json');
+          console.log(`[rates] resposta de '${agentId}':`, content);
           if (!content) continue;
           try {
             const parsed = JSON.parse(content) as Rates;
@@ -37,10 +40,14 @@ export function useRates(config: OpenClawConfig): { rates: Rates | null; loading
               setRates(parsed);
               break;
             }
-          } catch { continue; }
+          } catch (e) {
+            console.warn(`[rates] erro ao parsear JSON de '${agentId}':`, e);
+            continue;
+          }
         }
-      } catch { /* silencioso — BRL simplesmente não aparece */ }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error('[rates] erro geral:', e);
+      } finally { setLoading(false); }
     })();
   }, [config.baseUrl, config.token]);
 
