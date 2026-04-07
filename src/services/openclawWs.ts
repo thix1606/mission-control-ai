@@ -469,7 +469,10 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   return openClawSession(config, async (rpc, on) => {
     let healthResolve: ((p: any) => void) | null = null;
     const healthPromise = new Promise<any>(res => { healthResolve = res; });
-    on('health', (payload) => healthResolve?.(payload));
+    on('health', (payload) => {
+      console.log('[OpenClaw] health event payload:', JSON.stringify(payload, null, 2));
+      healthResolve?.(payload);
+    });
 
     // Busca config e modelos em paralelo na mesma sessão autenticada
     const [configData, modelsRaw] = await Promise.all([
