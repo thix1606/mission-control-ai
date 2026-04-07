@@ -58,3 +58,9 @@ export interface OpenClawConfig {
   baseUrl: string;
   token: string;
 }
+
+export interface ConfiguredModel {
+  id: string;       // ex: "anthropic/claude-sonnet-4-6" ou "claude-sonnet-4-6"
+  name: string;     // nome legível
+  provider: string; // ex: "anthropic", "openai", "google"
+}

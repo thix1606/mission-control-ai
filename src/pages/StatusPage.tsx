@@ -5,50 +5,41 @@
 // Configure a URL e o token em: Configurações (/settings)
 // ============================================================
 
-import { LayoutDashboard, Bot, Radio, RefreshCw, AlertTriangle, Settings, Pencil, Check, X } from 'lucide-react';
+import { LayoutDashboard, Bot, Radio, RefreshCw, AlertTriangle, Settings, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { useOpenClawData } from '../hooks/useOpenClawData';
+import type { ConfiguredModel } from '../types';
 
-// ── Modelos disponíveis ────────────────────────────────────
+// ── Helpers de modelo ──────────────────────────────────────
 
-const AVAILABLE_MODELS = [
-  { group: 'Anthropic', models: [
-    { id: 'claude-opus-4-6',           label: 'Claude Opus 4.6' },
-    { id: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6' },
-    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
-    { id: 'claude-opus-4-5',           label: 'Claude Opus 4.5' },
-  ]},
-  { group: 'OpenAI', models: [
-    { id: 'gpt-4o',      label: 'GPT-4o' },
-    { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { id: 'o3',          label: 'o3' },
-    { id: 'o4-mini',     label: 'o4-mini' },
-  ]},
-  { group: 'Google', models: [
-    { id: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro' },
-    { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash' },
-    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
-    { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro' },
-  ]},
-];
-
-const MODEL_OVERRIDES_KEY = 'mc_model_overrides';
-
-function loadOverrides(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(MODEL_OVERRIDES_KEY) ?? '{}'); }
-  catch { return {}; }
+function groupModelsByProvider(models: ConfiguredModel[]) {
+  const groups: Record<string, ConfiguredModel[]> = {};
+  for (const m of models) {
+    const key = m.provider || 'outro';
+    (groups[key] ??= []).push(m);
+  }
+  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
 }
 
 // ── Componente ─────────────────────────────────────────────
 
 export function StatusPage() {
   const { config } = useOpenClawConfig();
-  const { agents, channels, loading, error, refresh } = useOpenClawData(config);
+  const {
+    agents,
+    channels,
+    configuredModels,
+    loading,
+    error,
+    modelUpdating,
+    modelUpdateError,
+    refresh,
+    updateAgentModel,
+  } = useOpenClawData(config);
 
   const isConfigured = config.baseUrl && config.token;
 
@@ -56,14 +47,13 @@ export function StatusPage() {
   const totalIdle    = agents.filter((a) => a.status === 'idle').length;
   const totalOffline = agents.filter((a) => a.status === 'offline').length;
 
-  // ── Model overrides ──────────────────────────────────────
-  const [modelOverrides, setModelOverrides] = useState<Record<string, string>>(loadOverrides);
+  // ── Edição inline de modelo ──────────────────────────────
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
-  const [pendingModel, setPendingModel] = useState<string>('');
+  const [pendingModel, setPendingModel]     = useState<string>('');
 
   function startEdit(agentId: string, currentModel: string) {
     setEditingModelId(agentId);
-    setPendingModel(modelOverrides[agentId] ?? currentModel);
+    setPendingModel(currentModel);
   }
 
   function cancelEdit() {
@@ -71,19 +61,14 @@ export function StatusPage() {
     setPendingModel('');
   }
 
-  function confirmEdit(agentId: string) {
-    const updated = { ...modelOverrides, [agentId]: pendingModel };
-    setModelOverrides(updated);
-    localStorage.setItem(MODEL_OVERRIDES_KEY, JSON.stringify(updated));
+  async function confirmEdit(agentId: string) {
     setEditingModelId(null);
+    await updateAgentModel(agentId, pendingModel);
     setPendingModel('');
   }
 
-  function getEffectiveModel(agentId: string, originalModel: string) {
-    return modelOverrides[agentId] ?? originalModel;
-  }
-
-  const allModelIds = AVAILABLE_MODELS.flatMap((g) => g.models.map((m) => m.id));
+  const modelGroups = groupModelsByProvider(configuredModels);
+  const configuredModelIds = configuredModels.map((m) => m.id);
 
   return (
     <div className="p-8">
@@ -136,6 +121,17 @@ export function StatusPage() {
           <div>
             <p className="font-medium">Erro ao buscar dados do OpenClaw.</p>
             <p className="text-red-400/70 mt-0.5 font-mono text-xs">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Aviso: erro ao atualizar modelo */}
+      {modelUpdateError && (
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">Erro ao atualizar modelo no OpenClaw.</p>
+            <p className="text-red-400/70 mt-0.5 font-mono text-xs">{modelUpdateError}</p>
           </div>
         </div>
       )}
@@ -195,8 +191,7 @@ export function StatusPage() {
                 </tr>
               )}
               {agents.map((agent) => {
-                const effectiveModel = getEffectiveModel(agent.id, agent.model);
-                const isOverridden = modelOverrides[agent.id] != null && modelOverrides[agent.id] !== agent.model;
+                const isUpdating = modelUpdating === agent.id;
 
                 return (
                   <tr key={agent.id} className="hover:bg-gray-800/50 transition-colors">
@@ -209,7 +204,12 @@ export function StatusPage() {
 
                     {/* Célula de modelo — editável */}
                     <td className="px-4 py-3">
-                      {editingModelId === agent.id ? (
+                      {isUpdating ? (
+                        <span className="flex items-center gap-1.5 text-gray-500 font-mono text-xs">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          {agent.model}
+                        </span>
+                      ) : editingModelId === agent.id ? (
                         <div className="flex items-center gap-1.5">
                           <select
                             autoFocus
@@ -220,16 +220,24 @@ export function StatusPage() {
                               if (e.key === 'Escape') cancelEdit();
                             }}
                             className="bg-gray-800 border border-indigo-500/60 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-indigo-400"
+                            disabled={configuredModels.length === 0}
                           >
-                            {AVAILABLE_MODELS.map((group) => (
-                              <optgroup key={group.group} label={group.group}>
-                                {group.models.map((m) => (
-                                  <option key={m.id} value={m.id}>{m.label}</option>
+                            {configuredModels.length === 0 ? (
+                              <option value={agent.model}>{agent.model} (sem modelos configurados)</option>
+                            ) : (
+                              <>
+                                {modelGroups.map(([provider, models]) => (
+                                  <optgroup key={provider} label={provider.charAt(0).toUpperCase() + provider.slice(1)}>
+                                    {models.map((m) => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                  </optgroup>
                                 ))}
-                              </optgroup>
-                            ))}
-                            {!allModelIds.includes(pendingModel) && (
-                              <option value={pendingModel}>{pendingModel}</option>
+                                {/* Modelo atual do agente caso não esteja no catálogo */}
+                                {!configuredModelIds.includes(pendingModel) && (
+                                  <option value={pendingModel}>{pendingModel}</option>
+                                )}
+                              </>
                             )}
                           </select>
                           <button
@@ -251,14 +259,10 @@ export function StatusPage() {
                         <button
                           onClick={() => startEdit(agent.id, agent.model)}
                           className="group flex items-center gap-1.5 text-gray-400 font-mono text-xs hover:text-white transition-colors"
-                          title="Clique para alterar o modelo"
+                          title={configuredModels.length === 0 ? 'Sem modelos configurados no OpenClaw' : 'Clique para alterar o modelo'}
+                          disabled={configuredModels.length === 0}
                         >
-                          <span className={isOverridden ? 'text-indigo-300' : ''}>{effectiveModel}</span>
-                          {isOverridden && (
-                            <span className="text-indigo-400/60 font-sans text-[10px]" title={`Original: ${agent.model}`}>
-                              (editado)
-                            </span>
-                          )}
+                          <span>{agent.model}</span>
                           <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                         </button>
                       )}

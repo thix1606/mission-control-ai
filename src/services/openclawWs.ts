@@ -5,7 +5,7 @@
 // Autenticação: Ed25519 (chave pública 32 bytes, base64url) + token
 // ============================================================
 
-import type { Agent, Channel, OpenClawConfig } from '../types';
+import type { Agent, Channel, ConfiguredModel, OpenClawConfig } from '../types';
 
 // ── Armazenamento ──────────────────────────────────────────
 const KEYPAIR_PUB_KEY   = 'mc_openclaw_pub';
@@ -21,7 +21,7 @@ function base64url(bytes: Uint8Array): string {
 }
 
 async function sha256hex(bytes: Uint8Array): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  const hash = await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -100,13 +100,6 @@ async function signPayload(
 }
 
 // ── Parsing de resposta ────────────────────────────────────
-
-function mapStatus(raw?: string): 'online' | 'idle' | 'offline' {
-  const s = (raw ?? '').toLowerCase();
-  if (['online', 'active', 'running', 'connected'].includes(s)) return 'online';
-  if (['idle', 'paused', 'waiting'].includes(s)) return 'idle';
-  return 'offline';
-}
 
 function parseAgents(cfg: any, health?: any): Agent[] {
   const list: any[] = cfg?.agents?.list ?? [];
@@ -205,12 +198,16 @@ function toWsUrl(baseUrl: string): string {
   return baseUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://');
 }
 
-// ── API pública ────────────────────────────────────────────
+// ── Sessão autenticada (helper interno) ───────────────────
+// Abre WebSocket, autentica via Ed25519 e fornece `rpc` e `on` ao callback.
 
-export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
-  agents: Agent[];
-  channels: Channel[];
-}> {
+type RpcFn = (method: string, params?: any) => Promise<any>;
+type EventFn = (event: string, handler: (payload: any) => void) => void;
+
+async function openClawSession<T>(
+  config: OpenClawConfig,
+  callback: (rpc: RpcFn, on: EventFn) => Promise<T>,
+): Promise<T> {
   const { privateKey, publicKeyStr, deviceId } = await getOrCreateKeyPair();
   const storedDeviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
 
@@ -231,27 +228,27 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
     }, 15000);
 
     let reqId = 0;
-    const pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
+    const pending  = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
+    const handlers = new Map<string, (payload: any) => void>();
 
     function send(msg: WsMessage) { ws.send(JSON.stringify(msg)); }
 
-    function rpc(method: string, params?: any): Promise<any> {
+    const rpc: RpcFn = (method, params) => {
       const id = String(++reqId);
       return new Promise((res, rej) => {
         pending.set(id, { resolve: res, reject: rej });
         send({ type: 'req', id, method, params });
       });
-    }
+    };
 
-    let healthResolve: ((p: any) => void) | null = null;
-    const healthPromise = new Promise<any>(res => { healthResolve = res; });
+    const on: EventFn = (event, handler) => { handlers.set(event, handler); };
 
     ws.onmessage = async (event) => {
       let msg: WsMessage;
       try { msg = JSON.parse(event.data); } catch { return; }
 
-      if (msg.type === 'event' && msg.event === 'health') {
-        healthResolve?.(msg.payload);
+      if (msg.type === 'event' && msg.event) {
+        handlers.get(msg.event)?.(msg.payload);
       }
 
       if (msg.type === 'event' && msg.event === 'connect.challenge') {
@@ -262,60 +259,29 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
         const role       = 'operator';
         const scopes     = ['operator.admin', 'operator.read', 'operator.write', 'operator.approvals', 'operator.pairing'];
 
-        const sigPayload = {
-          deviceId,
-          clientId,
-          clientMode,
-          role,
-          scopes,
-          signedAtMs,
-          token: config.token ?? null,
-          nonce,
-        };
-        const signature = await signPayload(privateKey, sigPayload);
+        const sigPayload = { deviceId, clientId, clientMode, role, scopes, signedAtMs, token: config.token ?? null, nonce };
+        const signature  = await signPayload(privateKey, sigPayload);
 
         const connectParams = {
-            minProtocol: 3,
-            maxProtocol: 3,
-            client: {
-              id:         clientId,
-              version:    'control-ui',
-              platform:   navigator.platform,
-              mode:       clientMode,
-              instanceId: crypto.randomUUID(),
-            },
-            role,
-            scopes,
-            caps:   ['tool-events'],
-            auth: {
-              token:       config.token,
-              deviceToken: storedDeviceToken ?? undefined,
-            },
-            device: { id: deviceId, publicKey: publicKeyStr, nonce, signedAt: signedAtMs, signature },
-            userAgent: navigator.userAgent,
-            locale:    navigator.language,
+          minProtocol: 3, maxProtocol: 3,
+          client: { id: clientId, version: 'control-ui', platform: navigator.platform, mode: clientMode, instanceId: crypto.randomUUID() },
+          role, scopes, caps: ['tool-events'],
+          auth:   { token: config.token, deviceToken: storedDeviceToken ?? undefined },
+          device: { id: deviceId, publicKey: publicKeyStr, nonce, signedAt: signedAtMs, signature },
+          userAgent: navigator.userAgent,
+          locale:    navigator.language,
         };
+
         try {
           const hello = await rpc('connect', connectParams);
-
-          // Persiste device token para próximas conexões
           if (hello?.auth?.deviceToken) {
             localStorage.setItem(DEVICE_TOKEN_KEY, hello.auth.deviceToken);
           }
 
-          const configData = await rpc('config.get');
-
-
-          // Aguarda evento health (máx 5s) para obter status em tempo real
-          const health = await Promise.race([
-            healthPromise,
-            new Promise<null>(res => setTimeout(() => res(null), 5000)),
-          ]);
-
           clearTimeout(timeout);
+          const result = await callback(rpc, on);
           ws.close();
-          const cfg = configData?.parsed ?? configData;
-          resolve({ agents: parseAgents(cfg, health), channels: parseChannels(cfg, health) });
+          resolve(result);
         } catch (e: any) {
           clearTimeout(timeout);
           ws.close();
@@ -345,5 +311,95 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
         reject(new Error(`WebSocket fechado inesperadamente (código ${e.code}).`));
       }
     };
+  });
+}
+
+// ── Parsing de modelos configurados ───────────────────────
+
+function parseModels(raw: any): ConfiguredModel[] {
+  console.log('[OpenClaw] models.list raw:', JSON.stringify(raw, null, 2));
+
+  // Formato array de objetos: [{ id, name, provider, ... }]
+  if (Array.isArray(raw)) {
+    return raw.map((m: any) => {
+      const id       = String(m.id ?? m.modelId ?? m.model ?? m);
+      const provider = String(m.provider ?? inferProvider(id));
+      const name     = String(m.name ?? m.displayName ?? formatModelName(id));
+      return { id, name, provider };
+    });
+  }
+
+  // Formato objeto { modelId: { name, provider } }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([id, v]: [string, any]) => {
+      const provider = String(v?.provider ?? inferProvider(id));
+      const name     = String(v?.name ?? v?.displayName ?? formatModelName(id));
+      return { id, name, provider };
+    });
+  }
+
+  return [];
+}
+
+function inferProvider(modelId: string): string {
+  const id = modelId.toLowerCase();
+  if (id.startsWith('anthropic/') || id.includes('claude')) return 'anthropic';
+  if (id.startsWith('openai/')    || id.includes('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'openai';
+  if (id.startsWith('google/')    || id.includes('gemini')) return 'google';
+  if (id.startsWith('meta/')      || id.includes('llama')) return 'meta';
+  if (id.startsWith('mistral/')   || id.includes('mistral')) return 'mistral';
+  const slash = modelId.indexOf('/');
+  return slash !== -1 ? modelId.slice(0, slash) : 'outro';
+}
+
+function formatModelName(modelId: string): string {
+  // Remove prefixo de provider se presente (ex: "anthropic/claude-sonnet-4-6" → "claude-sonnet-4-6")
+  const id = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId;
+  return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── API pública ────────────────────────────────────────────
+
+export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
+  agents: Agent[];
+  channels: Channel[];
+}> {
+  return openClawSession(config, async (rpc, on) => {
+    let healthResolve: ((p: any) => void) | null = null;
+    const healthPromise = new Promise<any>(res => { healthResolve = res; });
+    on('health', (payload) => healthResolve?.(payload));
+
+    const configData = await rpc('config.get');
+    console.log('[OpenClaw] config.get raw:', JSON.stringify(configData, null, 2));
+
+    const health = await Promise.race([
+      healthPromise,
+      new Promise<null>(res => setTimeout(() => res(null), 5000)),
+    ]);
+
+    const cfg = configData?.parsed ?? configData;
+    return { agents: parseAgents(cfg, health), channels: parseChannels(cfg, health) };
+  });
+}
+
+export async function fetchConfiguredModels(config: OpenClawConfig): Promise<ConfiguredModel[]> {
+  return openClawSession(config, async (rpc) => {
+    const result = await rpc('models.list');
+    return parseModels(result);
+  });
+}
+
+export async function updateAgentModel(
+  config: OpenClawConfig,
+  agentId: string,
+  model: string,
+): Promise<void> {
+  await openClawSession(config, async (rpc) => {
+    // config.patch aplica um merge parcial sobre a configuração atual
+    await rpc('config.patch', {
+      agents: {
+        list: [{ id: agentId, model: { primary: model } }],
+      },
+    });
   });
 }

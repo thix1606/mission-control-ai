@@ -1,26 +1,33 @@
 // ============================================================
-// HOOK — DADOS DINÂMICOS DO OPENCLAW (agentes e canais)
+// HOOK — DADOS DINÂMICOS DO OPENCLAW (agentes, canais e modelos)
 // ============================================================
 // Usa WebSocket com protocolo RPC do OpenClaw.
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Agent, Channel, OpenClawConfig } from '../types';
-import { fetchViaWebSocket } from '../services/openclawWs';
+import type { Agent, Channel, ConfiguredModel, OpenClawConfig } from '../types';
+import { fetchViaWebSocket, fetchConfiguredModels, updateAgentModel as updateAgentModelRpc } from '../services/openclawWs';
 
 interface OpenClawData {
   agents: Agent[];
   channels: Channel[];
+  configuredModels: ConfiguredModel[];
   loading: boolean;
   error: string | null;
+  modelUpdating: string | null; // agentId em processo de atualização
+  modelUpdateError: string | null;
   refresh: () => void;
+  updateAgentModel: (agentId: string, model: string) => Promise<void>;
 }
 
 export function useOpenClawData(config: OpenClawConfig): OpenClawData {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [configuredModels, setConfiguredModels] = useState<ConfiguredModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelUpdating, setModelUpdating] = useState<string | null>(null);
+  const [modelUpdateError, setModelUpdateError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -29,10 +36,14 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
     setLoading(true);
     setError(null);
 
-    fetchViaWebSocket(config)
-      .then(({ agents, channels }) => {
+    Promise.all([
+      fetchViaWebSocket(config),
+      fetchConfiguredModels(config),
+    ])
+      .then(([{ agents, channels }, models]) => {
         setAgents(agents);
         setChannels(channels);
+        setConfiguredModels(models);
         setLoading(false);
       })
       .catch((err: any) => {
@@ -50,5 +61,32 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
     return () => clearInterval(id);
   }, [config.baseUrl, config.token]);
 
-  return { agents, channels, loading, error, refresh };
+  const updateAgentModel = useCallback(async (agentId: string, model: string) => {
+    setModelUpdating(agentId);
+    setModelUpdateError(null);
+    try {
+      await updateAgentModelRpc(config, agentId, model);
+      // Atualiza o agente localmente para refletir imediatamente
+      setAgents((prev) =>
+        prev.map((a) => a.id === agentId ? { ...a, model } : a)
+      );
+    } catch (err: any) {
+      setModelUpdateError(err?.message ?? 'Erro ao atualizar modelo.');
+      throw err;
+    } finally {
+      setModelUpdating(null);
+    }
+  }, [config]);
+
+  return {
+    agents,
+    channels,
+    configuredModels,
+    loading,
+    error,
+    modelUpdating,
+    modelUpdateError,
+    refresh,
+    updateAgentModel,
+  };
 }
