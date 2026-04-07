@@ -493,7 +493,12 @@ export async function updateAgentModel(
   model: string,
 ): Promise<void> {
   await openClawSession(config, async (rpc) => {
+    // O OpenClaw exige o hash atual da config para prevenir conflitos de escrita
+    const configData = await rpc('config.get');
+    const baseHash: string = configData?.hash;
+
     await rpc('config.patch', {
+      baseHash,
       raw: JSON.stringify({
         agents: {
           list: [{ id: agentId, model: { primary: model } }],
