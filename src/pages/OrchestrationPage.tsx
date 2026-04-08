@@ -14,6 +14,7 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -43,16 +44,18 @@ function DroppableColumn({
   col,
   tasks,
   agents,
+  isOver,
   onAssign,
   onDelete,
 }: {
   col: typeof COLUMNS[number];
   tasks: Task[];
   agents: { id: string; name: string }[];
+  isOver: boolean;
   onAssign: (taskId: string, agentId: string | null, agentName: string | null) => void;
   onDelete: (taskId: string) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: col.status });
+  const { setNodeRef } = useDroppable({ id: col.status });
 
   return (
     <div className="flex flex-col min-w-0">
@@ -121,21 +124,34 @@ export function OrchestrationPage() {
 
   // Drag state
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [overColumn, setOverColumn] = useState<TaskStatus | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  // Resolve o status da coluna a partir de um id (coluna ou card)
+  function resolveColumn(id: string | number): TaskStatus | null {
+    const idStr = String(id);
+    if (COLUMNS.some((c) => c.status === idStr)) return idStr as TaskStatus;
+    const task = tasks.find((t) => t.id === idStr);
+    return task?.status ?? null;
+  }
 
   function handleDragStart(event: DragStartEvent) {
     const task = tasks.find((t) => t.id === event.active.id);
     setActiveTask(task ?? null);
   }
 
+  function handleDragOver(event: DragOverEvent) {
+    const { over } = event;
+    setOverColumn(over ? resolveColumn(over.id) : null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
-    setActiveTask(null);
     const { active, over } = event;
+    setActiveTask(null);
+    setOverColumn(null);
     if (!over) return;
-    const targetStatus = over.id as TaskStatus;
-    if (COLUMNS.some((c) => c.status === targetStatus)) {
-      moveTask(String(active.id), targetStatus);
-    }
+    const targetStatus = resolveColumn(over.id);
+    if (targetStatus) moveTask(String(active.id), targetStatus);
   }
 
   // Formulário
@@ -190,7 +206,7 @@ export function OrchestrationPage() {
       </div>
 
       {/* Kanban */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {COLUMNS.map((col) => (
             <DroppableColumn
@@ -198,6 +214,7 @@ export function OrchestrationPage() {
               col={col}
               tasks={tasks.filter((t) => t.status === col.status)}
               agents={agentOptions}
+              isOver={overColumn === col.status}
               onAssign={assignAgent}
               onDelete={deleteTask}
             />

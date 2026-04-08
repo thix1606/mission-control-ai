@@ -76,7 +76,7 @@ export function KanbanCard({ task, agents, onAssign, onDelete }: KanbanCardProps
             const agent = agents.find((a) => a.id === e.target.value);
             onAssign(agent?.id ?? null, agent?.name ?? null);
           }}
-          className="flex-1 bg-transparent text-xs text-gray-400 focus:outline-none focus:text-white cursor-pointer"
+          className="flex-1 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
           onClick={(e) => e.stopPropagation()}
         >
           <option value="">Sem agente</option>
