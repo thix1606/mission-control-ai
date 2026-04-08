@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Activity, AlertTriangle, Bot, Check, ChevronRight,
-  Clock, Cpu, DollarSign, Hash, LayoutList, RefreshCw,
+  Clock, Cpu, DollarSign, Hash, LayoutList, RefreshCw, FileText,
   Settings, X, Zap,
 } from 'lucide-react';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
@@ -14,6 +14,7 @@ import { useOpenClawData } from '../hooks/useOpenClawData';
 import { useTaskData } from '../hooks/useTaskData';
 import { useAgentSessions } from '../hooks/useAgentSessions';
 import type { Agent, TaskStatus } from '../types';
+import { AgentFiles } from '../components/AgentFiles';
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -42,11 +43,12 @@ const PRIORITY_CLASSES = {
   low:    'bg-blue-500/10 text-blue-400 border-blue-500/20',
 };
 
-type Tab = 'overview' | 'tasks' | 'config' | 'sessions';
+type Tab = 'overview' | 'tasks' | 'files' | 'config' | 'sessions';
 
 const TABS: { id: Tab; label: string; icon: typeof Activity }[] = [
   { id: 'overview',  label: 'Visão Geral', icon: Activity },
   { id: 'tasks',     label: 'Tarefas',     icon: LayoutList },
+  { id: 'files',     label: 'Arquivos',     icon: FileText },
   { id: 'config',    label: 'Configuração', icon: Settings },
   { id: 'sessions',  label: 'Sessões',     icon: Zap },
 ];
@@ -218,6 +220,12 @@ export function AgentDetailPage() {
       )}
 
       {/* ── Tab: Configuração ── */}
+      
+      {/* ── Tab: Arquivos ── */}
+      {activeTab === 'files' && (
+        <AgentFiles agentId={agent.id} config={config} />
+      )}
+
       {activeTab === 'config' && (
         <div className="space-y-6 max-w-xl">
           {/* Modelo */}

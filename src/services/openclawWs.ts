@@ -626,6 +626,23 @@ function parseTelemetry(costRaw: any, sessionsRaw?: any): TelemetryData {
 
 // ── agents.files helpers ───────────────────────────────────
 
+
+export async function listAgentFiles(
+  config: OpenClawConfig,
+  agentId: string,
+): Promise<string[]> {
+  return openClawSession(config, async (rpc) => {
+    try {
+      const res = await rpc('agents.files.list', { agentId });
+      const files = res?.files ?? res?.items ?? res ?? [];
+      return Array.isArray(files) ? files.map(f => typeof f === 'string' ? f : f.name || f.path) : [];
+    } catch (e: any) {
+      console.warn(`[agents.files.list] erro agentId=${agentId}:`, e?.message);
+      return [];
+    }
+  });
+}
+
 export async function listAgentIds(config: OpenClawConfig): Promise<string[]> {
   return openClawSession(config, async (rpc) => {
     const configData = await rpc('config.get');
