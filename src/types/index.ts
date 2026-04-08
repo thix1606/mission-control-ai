@@ -4,7 +4,7 @@
 
 export type AgentStatus = 'online' | 'idle' | 'offline';
 export type ChannelStatus = 'online' | 'idle' | 'offline';
-export type TaskStatus = 'queue' | 'processing' | 'done' | 'failed';
+export type TaskStatus = 'queue' | 'processing' | 'reviewing' | 'done' | 'failed';
 
 export interface Agent {
   id: string;

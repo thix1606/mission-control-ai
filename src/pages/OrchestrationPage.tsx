@@ -34,6 +34,7 @@ import type { Task, TaskStatus } from '../types';
 const COLUMNS: { status: TaskStatus; label: string; color: string; borderColor: string; bg: string }[] = [
   { status: 'queue',      label: 'Fila de Espera',     color: 'text-blue-400',    borderColor: 'border-blue-500/30',    bg: 'bg-blue-500/5' },
   { status: 'processing', label: 'Em Processamento',   color: 'text-yellow-400',  borderColor: 'border-yellow-500/30',  bg: 'bg-yellow-500/5' },
+  { status: 'reviewing',  label: 'Em Revisão',         color: 'text-purple-400',  borderColor: 'border-purple-500/30',  bg: 'bg-purple-500/5' },
   { status: 'done',       label: 'Concluído',          color: 'text-emerald-400', borderColor: 'border-emerald-500/30', bg: 'bg-emerald-500/5' },
   { status: 'failed',     label: 'Falha',              color: 'text-red-400',     borderColor: 'border-red-500/30',     bg: 'bg-red-500/5' },
 ];
@@ -158,6 +159,9 @@ export function OrchestrationPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NewTaskForm>(EMPTY_FORM);
 
+  // Remove 'reviewing' das opções de criação manual — essa coluna é para uso dos agentes
+  const CREATABLE_COLUMNS = COLUMNS.filter((c) => c.status !== 'reviewing');
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return;
@@ -207,7 +211,7 @@ export function OrchestrationPage() {
 
       {/* Kanban */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           {COLUMNS.map((col) => (
             <DroppableColumn
               key={col.status}
@@ -289,7 +293,7 @@ export function OrchestrationPage() {
                     onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                   >
-                    {COLUMNS.map((c) => (
+                    {CREATABLE_COLUMNS.map((c) => (
                       <option key={c.status} value={c.status}>{c.label}</option>
                     ))}
                   </select>
