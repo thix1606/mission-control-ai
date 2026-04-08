@@ -7,12 +7,12 @@ import type { OpenClawConfig } from '../types';
 
 const STORAGE_KEY = 'openclaw_config';
 
-function deriveTasksApiUrl(baseUrl: string): string {
+// Usa a mesma origem do app — o nginx faz proxy de /api/tasks → 127.0.0.1:3001
+function deriveTasksApiUrl(): string {
   try {
-    const u = new URL(baseUrl);
-    return `${u.protocol}//${u.hostname}:3001`;
+    return window.location.origin;
   } catch {
-    return 'http://127.0.0.1:3001';
+    return 'http://127.0.0.1:3080';
   }
 }
 
@@ -21,15 +21,14 @@ function loadConfig(): OpenClawConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Deriva tasksApiUrl automaticamente se não estiver salvo
-      if (!parsed.tasksApiUrl) {
-        parsed.tasksApiUrl = deriveTasksApiUrl(parsed.baseUrl ?? 'http://127.0.0.1:18789');
+      // Limpa tasksApiUrls antigas com porta :3001 e re-deriva
+      if (!parsed.tasksApiUrl || parsed.tasksApiUrl.endsWith(':3001')) {
+        parsed.tasksApiUrl = deriveTasksApiUrl();
       }
       return parsed;
     }
   } catch {}
-  const baseUrl = 'http://127.0.0.1:18789';
-  return { baseUrl, token: '', tasksApiUrl: deriveTasksApiUrl(baseUrl) };
+  return { baseUrl: 'http://127.0.0.1:18789', token: '', tasksApiUrl: deriveTasksApiUrl() };
 }
 
 export function useOpenClawConfig() {

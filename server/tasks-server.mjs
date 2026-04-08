@@ -132,7 +132,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`[tasks-api] Rodando em http://0.0.0.0:${PORT}`);
+// Escuta apenas em loopback — acesso externo via nginx reverse proxy
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`[tasks-api] Rodando em http://127.0.0.1:${PORT}`);
   console.log(`[tasks-api] Arquivo: ${TASKS_FILE}`);
 });
