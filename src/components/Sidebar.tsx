@@ -49,7 +49,7 @@ export function Sidebar() {
   const { refreshing, lastSync } = useSyncStatus();
 
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-gray-900 border-r border-gray-800 shrink-0">
+    <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-800 z-40">
       {/* Logo / Título */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600">

@@ -22,7 +22,7 @@ function AppInner() {
   return (
     <div className="flex min-h-screen bg-gray-950 text-gray-100">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden ml-64">
         <TasksApiBanner status={tasksApiStatus} apiUrl={config.tasksApiUrl ?? ''} />
         <main className="flex-1 overflow-auto">
           <Routes>
