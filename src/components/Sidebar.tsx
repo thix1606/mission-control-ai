@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Users,
   CalendarClock,
+  X,
 } from 'lucide-react';
 import { useSyncStatus } from '../context/SyncStatusContext';
 
@@ -52,21 +53,42 @@ const NAV_ITEMS = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const { refreshing, lastSync } = useSyncStatus();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-800 z-40">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" 
+          onClick={onClose} 
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside 
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-800 z-50 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       {/* Logo / Título */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600">
-          <Bot className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between w-full px-6 py-5 border-b border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white leading-tight">Mission Control</p>
+              <p className="text-xs text-gray-500">AI Orchestration</p>
+            </div>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="md:hidden p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800">
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        <div>
-          <p className="text-sm font-bold text-white leading-tight">Mission Control</p>
-          <p className="text-xs text-gray-500">AI Orchestration</p>
-        </div>
-      </div>
 
       {/* Navegação */}
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -79,6 +101,7 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={onClose}
               end={item.path === '/'}
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
@@ -144,5 +167,6 @@ export function Sidebar() {
         <p className="text-xs text-gray-700">by Thiago Santos</p>
       </div>
     </aside>
+    </>
   );
 }
