@@ -70,7 +70,7 @@ export function TelemetryPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <PageHeader
         title="Telemetria"
         subtitle="Métricas de consumo de IA, relógio e clima"
@@ -191,14 +191,15 @@ export function TelemetryPage() {
             </h2>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[580px]">
               <thead>
                 <tr className="border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
                   <th className="text-left px-4 py-3">Modelo</th>
                   <th className="text-right px-4 py-3">Chamadas</th>
                   <th className="text-right px-4 py-3">Tokens totais</th>
                   <th className="text-right px-4 py-3">Cache lido</th>
-                  <th className="text-left px-4 py-3 w-44">Custo (USD)</th>
+                  <th className="text-left px-4 py-3">Custo (USD)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -240,6 +241,7 @@ export function TelemetryPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       )}
@@ -253,7 +255,8 @@ export function TelemetryPage() {
           </h2>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
                 <th className="text-left px-4 py-3">Data</th>
@@ -261,7 +264,7 @@ export function TelemetryPage() {
                 <th className="text-right px-4 py-3">Saída</th>
                 <th className="text-right px-4 py-3">Cache lido</th>
                 <th className="text-right px-4 py-3">Total tokens</th>
-                <th className="text-left px-4 py-3 w-40">Custo (USD)</th>
+                <th className="text-left px-4 py-3">Custo (USD)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
@@ -299,6 +302,7 @@ export function TelemetryPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </div>
