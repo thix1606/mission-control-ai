@@ -384,7 +384,7 @@ const PROVIDER_CATALOG: Record<string, Array<{ id: string; name: string }>> = {
 
 // ── Parsing de modelos configurados ───────────────────────
 
-function parseModels(raw: any, agentModelIds: string[] = []): ConfiguredModel[] {
+function parseModels(raw: any, agentModelIds: string[] = [], cfg: any = {}): ConfiguredModel[] {
   // Desembrulha envelopes comuns: { models: [...] }, { list: [...] }, { items: [...] }
   const data: any = Array.isArray(raw)
     ? raw
@@ -412,9 +412,15 @@ function parseModels(raw: any, agentModelIds: string[] = []): ConfiguredModel[] 
   }
 
   // Identifica providers: via models.list + fallback pelos modelos já em uso nos agentes
+  // Extrai providers configurados no auth.profiles (ex: anthropic:default, google:default)
+  const cfgProviders = cfg?.auth?.profiles
+    ? Object.keys(cfg.auth.profiles).map((k) => k.split(':')[0])
+    : [];
+    
   const configuredProviders = new Set([
     ...rawModels.map((m) => inferProvider(m.id)),
     ...agentModelIds.map((id) => inferProvider(id)),
+    ...cfgProviders,
   ]);
   configuredProviders.delete('outro'); // ignora providers desconhecidos
 
@@ -498,7 +504,7 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
 
     // Complementa a detecção de providers com os modelos já em uso pelos agentes
     const agentModelIds = agents.map((a) => a.model).filter((m) => m !== '—');
-    const configuredModels = parseModels(modelsRaw, agentModelIds);
+    const configuredModels = parseModels(modelsRaw, agentModelIds, cfg);
 
     return {
       agents,
