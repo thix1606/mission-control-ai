@@ -7,13 +7,12 @@ import type { OpenClawConfig } from '../types';
 
 const STORAGE_KEY = 'openclaw_config';
 
-// Usa a mesma origem do app — o nginx faz proxy de /api/tasks → 127.0.0.1:3001
-function deriveTasksApiUrl(): string {
-  try {
-    return window.location.origin;
-  } catch {
-    return 'http://127.0.0.1:3080';
-  }
+function deriveApiUrl(): string {
+  try { return window.location.origin; } catch { return 'https://127.0.0.1:3080'; }
+}
+
+function deriveOpenClawUrl(): string {
+  return deriveApiUrl() + '/openclaw';
 }
 
 function loadConfig(): OpenClawConfig {
@@ -21,23 +20,23 @@ function loadConfig(): OpenClawConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Limpa tasksApiUrls antigas com porta :3001 e re-deriva
       if (!parsed.tasksApiUrl || parsed.tasksApiUrl.endsWith(':3001')) {
-        parsed.tasksApiUrl = deriveTasksApiUrl();
+        parsed.tasksApiUrl = deriveApiUrl();
+      }
+      if (!parsed.baseUrl || parsed.baseUrl.startsWith('http://127.0.0.1:18789')) {
+        parsed.baseUrl = deriveOpenClawUrl();
       }
       return parsed;
     }
   } catch {}
-  return { baseUrl: 'http://127.0.0.1:18789', token: '', tasksApiUrl: deriveTasksApiUrl() };
+  return { baseUrl: deriveOpenClawUrl(), token: '', tasksApiUrl: deriveApiUrl() };
 }
 
 export function useOpenClawConfig() {
   const [config, setConfigState] = useState<OpenClawConfig>(loadConfig);
-
   const saveConfig = useCallback((next: OpenClawConfig) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setConfigState(next);
   }, []);
-
   return { config, saveConfig };
 }
