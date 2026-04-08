@@ -69,6 +69,19 @@ export interface OpenClawConfig {
   tasksApiUrl?: string; // URL da Tasks API (ex: http://host:3001)
 }
 
+export interface AgentSession {
+  sessionId: string;
+  name: string;
+  totalCost: number;
+  totalTokens: number;
+  modelUsage: Array<{
+    provider: string;
+    model: string;
+    count: number;
+    totals: { input: number; output: number; cacheRead: number; totalTokens: number; totalCost: number };
+  }>;
+}
+
 export interface ConfiguredModel {
   id: string;       // ex: "anthropic/claude-sonnet-4-6" ou "claude-sonnet-4-6"
   name: string;     // nome legível

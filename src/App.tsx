@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TasksApiBanner } from './components/TasksApiBanner';
 import { StatusPage } from './pages/StatusPage';
+import { AgentsPage } from './pages/AgentsPage';
+import { AgentDetailPage } from './pages/AgentDetailPage';
 import { OrchestrationPage } from './pages/OrchestrationPage';
 import { TelemetryPage } from './pages/TelemetryPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -25,6 +27,8 @@ function AppInner() {
         <main className="flex-1 overflow-auto">
           <Routes>
             <Route path="/" element={<StatusPage />} />
+            <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/agents/:id" element={<AgentDetailPage />} />
             <Route path="/orchestration" element={<OrchestrationPage />} />
             <Route path="/telemetry" element={<TelemetryPage />} />
             <Route path="/settings" element={<SettingsPage />} />

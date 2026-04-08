@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Settings,
   RefreshCw,
+  Users,
 } from 'lucide-react';
 import { useSyncStatus } from '../context/SyncStatusContext';
 
@@ -23,6 +24,12 @@ const NAV_ITEMS = [
     path: '/',
     icon: LayoutDashboard,
     description: 'Agentes e Canais',
+  },
+  {
+    label: 'Agentes',
+    path: '/agents',
+    icon: Users,
+    description: 'Gerenciar Agentes',
   },
   {
     label: 'Orquestração',

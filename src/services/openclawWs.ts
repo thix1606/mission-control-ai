@@ -656,6 +656,48 @@ export async function writeAgentFile(
   });
 }
 
+// ── Sessões por agente ─────────────────────────────────────
+
+export interface AgentSessionData {
+  sessions: import('../types').AgentSession[];
+  totalCost: number;
+  totalTokens: number;
+  sessionCount: number;
+}
+
+export async function fetchAgentSessions(
+  config: OpenClawConfig,
+  agentId: string,
+  agentName: string,
+): Promise<AgentSessionData> {
+  return openClawSession(config, async (rpc) => {
+    const raw = await rpc('sessions.usage', {}).catch(() => null);
+    const all: any[] = Array.isArray(raw?.sessions) ? raw.sessions : [];
+
+    const lId   = agentId.toLowerCase();
+    const lName = agentName.toLowerCase();
+    const filtered = all.filter((s: any) => {
+      const sn = String(s.name ?? '').toLowerCase();
+      return sn === lId || sn === lName;
+    });
+
+    const sessions = filtered.map((s: any) => ({
+      sessionId:   String(s.sessionId ?? s.id ?? ''),
+      name:        String(s.name ?? ''),
+      totalCost:   s.usage?.totalCost   ?? 0,
+      totalTokens: s.usage?.totalTokens ?? 0,
+      modelUsage:  Array.isArray(s.usage?.modelUsage) ? s.usage.modelUsage : [],
+    }));
+
+    return {
+      sessions,
+      totalCost:    sessions.reduce((sum, s) => sum + s.totalCost, 0),
+      totalTokens:  sessions.reduce((sum, s) => sum + s.totalTokens, 0),
+      sessionCount: sessions.length,
+    };
+  });
+}
+
 export async function updateAgentModel(
   config: OpenClawConfig,
   agentId: string,
