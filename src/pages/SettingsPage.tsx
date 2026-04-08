@@ -20,6 +20,8 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>(null);
+  const [testingTasks, setTestingTasks] = useState(false);
+  const [testTasksResult, setTestTasksResult] = useState<TestResult>(null);
 
   const isDirty = baseUrl !== config.baseUrl || token !== config.token || tasksApiUrl !== (config.tasksApiUrl ?? '');
 
@@ -48,6 +50,28 @@ export function SettingsPage() {
     setToken(config.token);
     setTasksApiUrl(config.tasksApiUrl ?? '');
     setTestResult(null);
+    setTestTasksResult(null);
+  }
+
+  async function handleTestTasks() {
+    setTestingTasks(true);
+    setTestTasksResult(null);
+    try {
+      const url = tasksApiUrl.trim();
+      if (!url) throw new Error('Configure a Tasks API URL primeiro.');
+      const res = await fetch(`${url}/api/tasks`, {
+        headers: { Authorization: `Bearer ${token.trim()}` },
+      });
+      if (res.status === 401) throw new Error('Token inválido ou não autorizado.');
+      if (!res.ok) throw new Error(`Erro HTTP ${res.status}.`);
+      const data = await res.json();
+      const count = data.tasks?.length ?? 0;
+      setTestTasksResult({ ok: true, message: `Conectado! ${count} tarefa(s) encontrada(s).` });
+    } catch (err: any) {
+      setTestTasksResult({ ok: false, message: err?.message ?? 'Falha ao conectar.' });
+    } finally {
+      setTestingTasks(false);
+    }
   }
 
   async function handleTest() {
@@ -134,16 +158,38 @@ export function SettingsPage() {
               <label className="block text-xs text-gray-400 mb-1.5">
                 Tasks API URL
               </label>
-              <input
-                type="url"
-                value={tasksApiUrl}
-                onChange={(e) => { setTasksApiUrl(e.target.value); setSaved(false); }}
-                placeholder="http://host:3001"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={tasksApiUrl}
+                  onChange={(e) => { setTasksApiUrl(e.target.value); setSaved(false); setTestTasksResult(null); }}
+                  placeholder="http://host:3001"
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                />
+                <button
+                  onClick={handleTestTasks}
+                  disabled={testingTasks || !tasksApiUrl}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                >
+                  <Wifi className="w-4 h-4" />
+                  {testingTasks ? 'Testando...' : 'Testar'}
+                </button>
+              </div>
               <p className="text-xs text-gray-600 mt-1">
                 Micro API para persistência de tarefas do Kanban. Derivada automaticamente se vazia.
               </p>
+              {testTasksResult && (
+                <div className={`flex items-center gap-2 mt-2 p-2.5 rounded-lg text-xs border ${
+                  testTasksResult.ok
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-red-500/10 border-red-500/30 text-red-400'
+                }`}>
+                  {testTasksResult.ok
+                    ? <Wifi className="w-3.5 h-3.5 shrink-0" />
+                    : <WifiOff className="w-3.5 h-3.5 shrink-0" />}
+                  {testTasksResult.message}
+                </div>
+              )}
             </div>
           </div>
         </div>
