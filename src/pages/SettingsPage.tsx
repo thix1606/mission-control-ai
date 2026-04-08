@@ -15,7 +15,6 @@ export function SettingsPage() {
 
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [token, setToken] = useState(config.token);
-  const [tasksApiUrl, setTasksApiUrl] = useState(config.tasksApiUrl ?? '');
   const [showToken, setShowToken] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -23,7 +22,7 @@ export function SettingsPage() {
   const [testingTasks, setTestingTasks] = useState(false);
   const [testTasksResult, setTestTasksResult] = useState<TestResult>(null);
 
-  const isDirty = baseUrl !== config.baseUrl || token !== config.token || tasksApiUrl !== (config.tasksApiUrl ?? '');
+  const isDirty = baseUrl !== config.baseUrl || token !== config.token;
 
   const [deviceId, setDeviceId] = useState<string>('');
   useEffect(() => {
@@ -39,7 +38,7 @@ export function SettingsPage() {
   }
 
   function handleSave() {
-    saveConfig({ baseUrl: baseUrl.trim(), token: token.trim(), tasksApiUrl: tasksApiUrl.trim() || undefined });
+    saveConfig({ baseUrl: baseUrl.trim(), token: token.trim() });
     setSaved(true);
     setTestResult(null);
     setTimeout(() => setSaved(false), 2500);
@@ -48,7 +47,6 @@ export function SettingsPage() {
   function handleReset() {
     setBaseUrl(config.baseUrl);
     setToken(config.token);
-    setTasksApiUrl(config.tasksApiUrl ?? '');
     setTestResult(null);
     setTestTasksResult(null);
   }
@@ -57,8 +55,7 @@ export function SettingsPage() {
     setTestingTasks(true);
     setTestTasksResult(null);
     try {
-      const url = tasksApiUrl.trim();
-      if (!url) throw new Error('Configure a Tasks API URL primeiro.');
+      const url = config.tasksApiUrl ?? window.location.origin;
       const res = await fetch(`${url}/api/tasks`, {
         headers: { Authorization: `Bearer ${token.trim()}` },
       });
@@ -153,22 +150,18 @@ export function SettingsPage() {
               </p>
             </div>
 
-            {/* Tasks API URL */}
+            {/* Tasks API */}
             <div>
               <label className="block text-xs text-gray-400 mb-1.5">
-                Tasks API URL
+                Tasks API
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={tasksApiUrl}
-                  onChange={(e) => { setTasksApiUrl(e.target.value); setSaved(false); setTestTasksResult(null); }}
-                  placeholder="http://host:3001"
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
-                />
+              <div className="flex items-center gap-3">
+                <code className="flex-1 text-xs text-gray-500 font-mono bg-gray-800 px-3 py-2.5 rounded-lg truncate">
+                  {config.tasksApiUrl ?? window.location.origin}/api/tasks
+                </code>
                 <button
                   onClick={handleTestTasks}
-                  disabled={testingTasks || !tasksApiUrl}
+                  disabled={testingTasks}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   <Wifi className="w-4 h-4" />
@@ -176,7 +169,7 @@ export function SettingsPage() {
                 </button>
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                Micro API para persistência de tarefas do Kanban. Derivada automaticamente se vazia.
+                Roteada pelo nginx — mesma origem do app, sem porta extra.
               </p>
               {testTasksResult && (
                 <div className={`flex items-center gap-2 mt-2 p-2.5 rounded-lg text-xs border ${
