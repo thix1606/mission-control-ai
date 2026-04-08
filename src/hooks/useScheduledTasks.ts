@@ -2,8 +2,8 @@
 // HOOK — Tarefas Agendadas (system crontab + OpenClaw crons)
 // ============================================================
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { SystemCron, OpenClawCron, CronSource, OpenClawConfig } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import type { SystemCron, OpenClawCron, OpenClawConfig } from '../types';
 import { fetchOpenClawCrons } from '../services/openclawWs';
 
 async function fetchSystemCrons(config: OpenClawConfig): Promise<SystemCron[]> {

@@ -9,7 +9,6 @@ import {
   Clock, Cpu, DollarSign, Hash, LayoutList, RefreshCw,
   Settings, X, Zap,
 } from 'lucide-react';
-import { PageHeader } from '../components/PageHeader';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { useOpenClawData } from '../hooks/useOpenClawData';
 import { useTaskData } from '../hooks/useTaskData';
