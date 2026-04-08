@@ -66,6 +66,7 @@ export interface WeatherData {
 export interface OpenClawConfig {
   baseUrl: string;
   token: string;
+  tasksApiUrl?: string; // URL da Tasks API (ex: http://host:3001)
 }
 
 export interface ConfiguredModel {

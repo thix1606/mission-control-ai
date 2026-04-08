@@ -7,12 +7,29 @@ import type { OpenClawConfig } from '../types';
 
 const STORAGE_KEY = 'openclaw_config';
 
+function deriveTasksApiUrl(baseUrl: string): string {
+  try {
+    const u = new URL(baseUrl);
+    return `${u.protocol}//${u.hostname}:3001`;
+  } catch {
+    return 'http://127.0.0.1:3001';
+  }
+}
+
 function loadConfig(): OpenClawConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Deriva tasksApiUrl automaticamente se não estiver salvo
+      if (!parsed.tasksApiUrl) {
+        parsed.tasksApiUrl = deriveTasksApiUrl(parsed.baseUrl ?? 'http://127.0.0.1:18789');
+      }
+      return parsed;
+    }
   } catch {}
-  return { baseUrl: 'http://127.0.0.1:18789', token: '' };
+  const baseUrl = 'http://127.0.0.1:18789';
+  return { baseUrl, token: '', tasksApiUrl: deriveTasksApiUrl(baseUrl) };
 }
 
 export function useOpenClawConfig() {

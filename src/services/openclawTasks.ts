@@ -1,64 +1,43 @@
 // ============================================================
-// SERVICE — TASKS VIA OPENCLAW agents.files RPC
+// SERVICE — TASKS VIA TASKS API (HTTP REST)
 // ============================================================
-// tasks.json é gravado no workspace de cada agente para que
-// todos tenham acesso às tarefas no contexto do sistema prompt.
+// Persiste tarefas num servidor HTTP dedicado (tasks-server.mjs).
+// Fallback para localStorage quando a API não está disponível.
 // ============================================================
 
 import type { Task, OpenClawConfig } from '../types';
+import { fetchTasksApi, saveTasksApi, ConflictError } from './tasksApi';
 
-const TASKS_FILE = 'tasks.json';
-
-// ── Helpers ────────────────────────────────────────────────
-
-function serializeTasks(tasks: Task[]): string {
-  return JSON.stringify({ _note: 'Tasks gerenciadas pelo Mission Control.', tasks }, null, 2);
-}
-
-function deserializeTasks(content: string): Task[] {
-  try {
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : (parsed?.tasks ?? []);
-  } catch {
-    return [];
-  }
-}
-
-// ── Importa o helper de sessão do serviço WS principal ─────
-// Reexportamos openClawSession via uma função wrapper para não
-// duplicar a lógica de autenticação.
-
-import { readAgentFile, writeAgentFile, listAgentIds } from './openclawWs';
+export { ConflictError };
 
 // ── API pública ────────────────────────────────────────────
 
-export async function fetchTasks(config: OpenClawConfig): Promise<Task[]> {
+export async function fetchTasks(
+  config: OpenClawConfig,
+): Promise<{ tasks: Task[]; hash: string | null }> {
+  const apiUrl = config.tasksApiUrl;
+  if (!apiUrl) return { tasks: loadFromLocalStorage(), hash: null };
+
   try {
-    // Lê do workspace do primeiro agente disponível (todos têm o mesmo arquivo)
-    const agentIds = await listAgentIds(config);
-    if (agentIds.length === 0) return loadFromLocalStorage();
-
-    const content = await readAgentFile(config, agentIds[0], TASKS_FILE);
-    if (!content) return loadFromLocalStorage();
-
-    const tasks = deserializeTasks(content);
+    const { tasks, hash } = await fetchTasksApi(apiUrl, config.token);
     saveToLocalStorage(tasks);
-    return tasks;
+    return { tasks, hash };
   } catch {
-    return loadFromLocalStorage();
+    return { tasks: loadFromLocalStorage(), hash: null };
   }
 }
 
-export async function saveTasks(config: OpenClawConfig, tasks: Task[]): Promise<void> {
+export async function saveTasks(
+  config: OpenClawConfig,
+  tasks: Task[],
+  hash: string | null,
+): Promise<{ hash: string | null }> {
   saveToLocalStorage(tasks);
-  try {
-    const content = serializeTasks(tasks);
-    const agentIds = await listAgentIds(config);
-    // Grava em todos os agentes (workspace independentes)
-    await Promise.all(agentIds.map((id) => writeAgentFile(config, id, TASKS_FILE, content)));
-  } catch (err) {
-    console.warn('[Tasks] Falha ao persistir no OpenClaw, mantido em localStorage:', err);
-  }
+  const apiUrl = config.tasksApiUrl;
+  if (!apiUrl) return { hash: null };
+
+  const result = await saveTasksApi(apiUrl, config.token, tasks, hash);
+  return { hash: result.hash };
 }
 
 // ── Fallback localStorage ──────────────────────────────────

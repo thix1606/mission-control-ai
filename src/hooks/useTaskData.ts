@@ -1,10 +1,10 @@
 // ============================================================
-// HOOK — TASKS DO KANBAN (persistidas via OpenClaw agents.files)
+// HOOK — TASKS DO KANBAN (persistidas via Tasks API HTTP)
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, TaskStatus, OpenClawConfig } from '../types';
-import { fetchTasks, saveTasks } from '../services/openclawTasks';
+import { fetchTasks, saveTasks, ConflictError } from '../services/openclawTasks';
 
 interface UseTaskDataReturn {
   tasks: Task[];
@@ -18,17 +18,31 @@ interface UseTaskDataReturn {
 export function useTaskData(config: OpenClawConfig): UseTaskDataReturn {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const hashRef = useRef<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     fetchTasks(config)
-      .then(setTasks)
+      .then(({ tasks: t, hash }) => {
+        setTasks(t);
+        hashRef.current = hash;
+      })
       .finally(() => setLoading(false));
-  }, [config.baseUrl, config.token]);
+  }, [config.baseUrl, config.token, config.tasksApiUrl]);
 
   const persist = useCallback(async (updated: Task[]) => {
     setTasks(updated);
-    await saveTasks(config, updated);
+    try {
+      const { hash } = await saveTasks(config, updated, hashRef.current);
+      hashRef.current = hash;
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        // Conflito: outra sessão alterou as tarefas — recarrega do servidor
+        setTasks(err.serverTasks);
+        hashRef.current = err.serverHash;
+        console.warn('[Tasks] Conflito detectado — recarregado do servidor.');
+      }
+    }
   }, [config]);
 
   const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt'>) => {

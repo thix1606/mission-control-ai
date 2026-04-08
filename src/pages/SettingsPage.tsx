@@ -15,12 +15,13 @@ export function SettingsPage() {
 
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [token, setToken] = useState(config.token);
+  const [tasksApiUrl, setTasksApiUrl] = useState(config.tasksApiUrl ?? '');
   const [showToken, setShowToken] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>(null);
 
-  const isDirty = baseUrl !== config.baseUrl || token !== config.token;
+  const isDirty = baseUrl !== config.baseUrl || token !== config.token || tasksApiUrl !== (config.tasksApiUrl ?? '');
 
   const [deviceId, setDeviceId] = useState<string>('');
   useEffect(() => {
@@ -36,7 +37,7 @@ export function SettingsPage() {
   }
 
   function handleSave() {
-    saveConfig({ baseUrl: baseUrl.trim(), token: token.trim() });
+    saveConfig({ baseUrl: baseUrl.trim(), token: token.trim(), tasksApiUrl: tasksApiUrl.trim() || undefined });
     setSaved(true);
     setTestResult(null);
     setTimeout(() => setSaved(false), 2500);
@@ -45,6 +46,7 @@ export function SettingsPage() {
   function handleReset() {
     setBaseUrl(config.baseUrl);
     setToken(config.token);
+    setTasksApiUrl(config.tasksApiUrl ?? '');
     setTestResult(null);
   }
 
@@ -124,6 +126,23 @@ export function SettingsPage() {
               </div>
               <p className="text-xs text-gray-600 mt-1">
                 Configure via: <code className="text-indigo-400">openclaw config set gateway.token seu-token</code>
+              </p>
+            </div>
+
+            {/* Tasks API URL */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">
+                Tasks API URL
+              </label>
+              <input
+                type="url"
+                value={tasksApiUrl}
+                onChange={(e) => { setTasksApiUrl(e.target.value); setSaved(false); }}
+                placeholder="http://host:3001"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                Micro API para persistência de tarefas do Kanban. Derivada automaticamente se vazia.
               </p>
             </div>
           </div>
