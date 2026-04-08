@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // ============================================================
-// MICRO API — Persistência de tarefas do Mission Control
+// MICRO API — Mission Control Backend
 // ============================================================
 // Endpoints:
 //   GET  /api/tasks  → lê tasks.json, retorna { tasks, hash }
 //   PUT  /api/tasks  → grava tasks.json (lock otimista via If-Match)
+//   GET  /api/rates  → lê rates.json, retorna cotações BRL (público)
 //
 // Variáveis de ambiente:
 //   TASKS_API_TOKEN  (obrigatório) — Bearer token para autenticação
 //   PORT             (default 3001)
 //   TASKS_FILE       (default ./tasks.json)
+//   RATES_FILE       (default ./rates.json)
 //   CORS_ORIGIN      (default *)
 // ============================================================
 
@@ -20,6 +22,7 @@ import { createHash } from 'node:crypto';
 const TOKEN      = process.env.TASKS_API_TOKEN;
 const PORT       = parseInt(process.env.PORT ?? '3001', 10);
 const TASKS_FILE = process.env.TASKS_FILE ?? './tasks.json';
+const RATES_FILE = process.env.RATES_FILE ?? './rates.json';
 const CORS       = process.env.CORS_ORIGIN ?? '*';
 
 if (!TOKEN) {
@@ -53,7 +56,6 @@ function authOk(req) {
   if (!hdr.startsWith('Bearer ')) return false;
   const t = hdr.slice(7);
   if (t.length !== TOKEN.length) return false;
-  // Comparação em tempo constante
   const a = Buffer.from(t);
   const b = Buffer.from(TOKEN);
   let diff = 0;
@@ -87,12 +89,24 @@ const server = createServer(async (req, res) => {
     return res.end();
   }
 
-  // Somente /api/tasks
+  // GET /api/rates — público (sem autenticação, dados públicos)
+  if (url.pathname === '/api/rates' && req.method === 'GET') {
+    if (!existsSync(RATES_FILE)) {
+      return json(res, 404, { error: 'rates.json não encontrado. Execute o script fetch-rates.mjs.' });
+    }
+    try {
+      const data = JSON.parse(readFileSync(RATES_FILE, 'utf8'));
+      return json(res, 200, data);
+    } catch {
+      return json(res, 500, { error: 'Erro ao ler rates.json' });
+    }
+  }
+
+  // Demais rotas exigem autenticação
   if (url.pathname !== '/api/tasks') {
     return json(res, 404, { error: 'Not found' });
   }
 
-  // Autenticação
   if (!authOk(req)) {
     return json(res, 401, { error: 'Unauthorized' });
   }
@@ -108,7 +122,6 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       const incoming = JSON.parse(body);
 
-      // Lock otimista
       const ifMatch = req.headers['if-match'];
       if (ifMatch) {
         const { raw: current } = readTasks();
@@ -135,5 +148,6 @@ const server = createServer(async (req, res) => {
 // Escuta apenas em loopback — acesso externo via nginx reverse proxy
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`[tasks-api] Rodando em http://127.0.0.1:${PORT}`);
-  console.log(`[tasks-api] Arquivo: ${TASKS_FILE}`);
+  console.log(`[tasks-api] tasks: ${TASKS_FILE}`);
+  console.log(`[tasks-api] rates: ${RATES_FILE}`);
 });

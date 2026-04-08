@@ -35,7 +35,7 @@ export function TelemetryPage() {
   const { time, date } = useClock();
   const { config } = useOpenClawConfig();
   const { data, loading: telLoading, error: telError } = useTelemetryData(config);
-  const { rates } = useRates(config);
+  const { rates } = useRates();
 
   const usdToBrl = rates?.USDBRL ?? null;
 

@@ -1,13 +1,11 @@
 // ============================================================
-// HOOK — Cotações do dia (lidas de rates.json no workspace)
+// HOOK — Cotações do dia (via GET /api/rates no backend)
 // ============================================================
-// O arquivo é escrito por cron no workspace de cada agente.
-// Tenta ler de cada agente até encontrar um rates.json válido.
+// O script fetch-rates.mjs grava rates.json na pasta do backend.
+// O endpoint /api/rates serve esse arquivo sem autenticação.
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import type { OpenClawConfig } from '../types';
-import { listAgentIds, readAgentFile } from '../services/openclawWs';
 
 export interface Rates {
   updatedAt: string;
@@ -17,38 +15,23 @@ export interface Rates {
   ETHBRL: number;
 }
 
-export function useRates(config: OpenClawConfig): { rates: Rates | null; loading: boolean } {
+export function useRates(): { rates: Rates | null; loading: boolean } {
   const [rates, setRates]     = useState<Rates | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!config.baseUrl) return;
     setLoading(true);
-
-    (async () => {
-      try {
-        const agentIds = await listAgentIds(config);
-        console.log('[rates] agentIds:', agentIds);
-        for (const agentId of agentIds) {
-          const content = await readAgentFile(config, agentId, 'rates.json');
-          console.log(`[rates] conteúdo de '${agentId}'/rates.json:`, content);
-          if (!content) continue;
-          try {
-            const parsed = JSON.parse(content) as Rates;
-            if (parsed.USDBRL) {
-              setRates(parsed);
-              break;
-            }
-          } catch (e) {
-            console.warn('[rates] erro ao parsear:', e);
-            continue;
-          }
-        }
-      } catch (e) {
-        console.error('[rates] erro geral:', e);
-      } finally { setLoading(false); }
-    })();
-  }, [config.baseUrl, config.token]);
+    fetch(`${window.location.origin}/api/rates`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: Rates) => {
+        if (data.USDBRL) setRates(data);
+      })
+      .catch(() => { /* silencioso — BRL simplesmente não aparece */ })
+      .finally(() => setLoading(false));
+  }, []);
 
   return { rates, loading };
 }
