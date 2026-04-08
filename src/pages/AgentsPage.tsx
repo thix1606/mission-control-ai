@@ -43,7 +43,7 @@ export function AgentsPage() {
   }, [tasks]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <PageHeader
         title="Agentes"
         subtitle="Visão geral e gerenciamento dos agentes"

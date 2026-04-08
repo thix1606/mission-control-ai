@@ -79,7 +79,7 @@ export function StatusPage() {
   const configuredModelIds = configuredModels.map((m) => m.id);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-start justify-between mb-6">
         <PageHeader
           title="Status"
@@ -172,7 +172,8 @@ export function StatusPage() {
           </h2>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
                 <th className="text-left px-4 py-3">Agente</th>
@@ -308,6 +309,7 @@ export function StatusPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
@@ -320,7 +322,8 @@ export function StatusPage() {
           </h2>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
             <thead>
               <tr className="border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
                 <th className="text-left px-4 py-3">Canal</th>
@@ -381,6 +384,7 @@ export function StatusPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </div>

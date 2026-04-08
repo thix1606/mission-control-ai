@@ -104,7 +104,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       <PageHeader
         title="Configurações"
         subtitle="Integração com o servidor OpenClaw"

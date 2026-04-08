@@ -52,11 +52,16 @@ const NAV_ITEMS = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { refreshing, lastSync } = useSyncStatus();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-800 z-40">
+    <aside className={`fixed left-0 top-0 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-800 z-40 transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Logo / Título */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600">
@@ -80,6 +85,7 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               end={item.path === '/'}
+              onClick={onClose}
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                   isActive
@@ -104,6 +110,7 @@ export function Sidebar() {
         <div className="pt-4 mt-4 border-t border-gray-800">
           <NavLink
             to="/settings"
+            onClick={onClose}
             className={({ isActive }) =>
               `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                 isActive

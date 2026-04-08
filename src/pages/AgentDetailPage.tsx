@@ -85,7 +85,7 @@ export function AgentDetailPage() {
 
   if (!agent && agents.length > 0) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center h-64 gap-4">
+      <div className="p-4 md:p-8 flex flex-col items-center justify-center h-64 gap-4">
         <Bot className="w-10 h-10 text-gray-700" />
         <p className="text-gray-500">Agente não encontrado.</p>
         <Link to="/agents" className="text-indigo-400 text-sm hover:underline flex items-center gap-1">
@@ -98,7 +98,7 @@ export function AgentDetailPage() {
   if (!agent) return null;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Breadcrumb */}
       <Link to="/agents" className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 mb-4 transition-colors w-fit">
         <ArrowLeft className="w-3.5 h-3.5" />
@@ -123,7 +123,7 @@ export function AgentDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 mb-6 gap-1">
+      <div className="flex border-b border-gray-800 mb-6 gap-1 overflow-x-auto">
         {TABS.map(({ id: tabId, label, icon: Icon }) => (
           <button
             key={tabId}
@@ -352,7 +352,7 @@ export function AgentDetailPage() {
               </div>
 
               {/* Lista */}
-              <div className="divide-y divide-gray-800 max-h-[480px] overflow-y-auto">
+              <div className="divide-y divide-gray-800 max-h-[60vh] overflow-y-auto">
                 {sessionsData.sessions.map((s) => (
                   <div key={s.sessionId} className="flex items-center justify-between px-5 py-3 hover:bg-gray-800/40 transition-colors">
                     <div className="min-w-0">
