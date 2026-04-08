@@ -82,6 +82,30 @@ export interface AgentSession {
   }>;
 }
 
+export interface SystemCron {
+  id: string;
+  schedule: string;
+  command: string;
+  enabled: boolean;
+  comment?: string;
+}
+
+export interface OpenClawCron {
+  id: string;
+  name?: string;
+  schedule?: string;
+  command?: string;
+  enabled: boolean;
+  lastRun?: string;
+  nextRun?: string;
+  failCount?: number;
+  runCount?: number;
+  avgDurationMs?: number;
+  [key: string]: unknown;
+}
+
+export type CronSource = 'system' | 'openclaw';
+
 export interface ConfiguredModel {
   id: string;       // ex: "anthropic/claude-sonnet-4-6" ou "claude-sonnet-4-6"
   name: string;     // nome legível

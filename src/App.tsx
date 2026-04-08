@@ -11,6 +11,7 @@ import { AgentDetailPage } from './pages/AgentDetailPage';
 import { OrchestrationPage } from './pages/OrchestrationPage';
 import { TelemetryPage } from './pages/TelemetryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ScheduledTasksPage } from './pages/ScheduledTasksPage';
 import { SyncStatusProvider } from './context/SyncStatusContext';
 import { useOpenClawConfig } from './hooks/useOpenClawConfig';
 import { useTasksApiHealth } from './hooks/useTasksApiHealth';
@@ -31,6 +32,7 @@ function AppInner() {
             <Route path="/agents/:id" element={<AgentDetailPage />} />
             <Route path="/orchestration" element={<OrchestrationPage />} />
             <Route path="/telemetry" element={<TelemetryPage />} />
+            <Route path="/scheduled" element={<ScheduledTasksPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>

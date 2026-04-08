@@ -656,6 +656,31 @@ export async function writeAgentFile(
   });
 }
 
+// ── Crons do OpenClaw ──────────────────────────────────────
+
+export async function fetchOpenClawCrons(
+  config: OpenClawConfig,
+): Promise<import('../types').OpenClawCron[]> {
+  return openClawSession(config, async (rpc) => {
+    const raw = await rpc('cron.list', {}).catch(() => null);
+    const list: any[] = Array.isArray(raw)
+      ? raw
+      : (raw?.crons ?? raw?.list ?? raw?.items ?? []);
+    return list.map((c: any, i: number) => ({
+      id:           String(c.id ?? c.name ?? `cron-${i}`),
+      name:         c.name     ?? undefined,
+      schedule:     c.schedule ?? c.cron    ?? c.expr    ?? undefined,
+      command:      c.command  ?? c.cmd     ?? c.handler ?? undefined,
+      enabled:      c.enabled  ?? c.active  ?? true,
+      lastRun:      c.lastRun  ?? c.last_run  ?? undefined,
+      nextRun:      c.nextRun  ?? c.next_run  ?? undefined,
+      failCount:    c.failCount    ?? c.failures ?? 0,
+      runCount:     c.runCount     ?? c.runs     ?? 0,
+      avgDurationMs: c.avgDurationMs ?? c.avgDuration ?? undefined,
+    }));
+  });
+}
+
 // ── Sessões por agente ─────────────────────────────────────
 
 export interface AgentSessionData {

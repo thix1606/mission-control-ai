@@ -18,6 +18,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 
 const TOKEN      = process.env.TASKS_API_TOKEN;
 const PORT       = parseInt(process.env.PORT ?? '3001', 10);
@@ -78,6 +79,67 @@ function readBody(req) {
   });
 }
 
+// ── Crontab helpers ───────────────────────────────────────
+
+const CRON_FIELD = /^(\*|@\w+|[0-9*\/,\-]+)$/;
+
+function isCronExpression(parts) {
+  // @keyword OR 5 valid cron fields
+  if (parts.length === 1 && parts[0].startsWith('@')) return true;
+  if (parts.length < 6) return false;
+  return parts.slice(0, 5).every((p) => CRON_FIELD.test(p));
+}
+
+function parseCrontab(raw) {
+  const crons = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('#')) {
+      // Possibly a disabled cron (# schedule command)
+      const rest = trimmed.slice(1).trim();
+      const parts = rest.split(/\s+/);
+      if (!isCronExpression(parts)) continue; // pure comment line
+      const isShorthand = parts[0].startsWith('@');
+      const schedule = isShorthand ? parts[0] : parts.slice(0, 5).join(' ');
+      const command  = isShorthand ? parts.slice(1).join(' ') : parts.slice(5).join(' ');
+      if (!command) continue;
+      crons.push({ id: hash(schedule + command), schedule, command, enabled: false });
+    } else {
+      const parts = trimmed.split(/\s+/);
+      if (!isCronExpression(parts)) continue;
+      const isShorthand = parts[0].startsWith('@');
+      const schedule = isShorthand ? parts[0] : parts.slice(0, 5).join(' ');
+      const cmdParts  = isShorthand ? parts.slice(1) : parts.slice(5);
+      // Strip inline comment
+      const commentIdx = cmdParts.findIndex((p) => p.startsWith('#'));
+      const command  = (commentIdx === -1 ? cmdParts : cmdParts.slice(0, commentIdx)).join(' ');
+      const comment  = commentIdx !== -1 ? cmdParts.slice(commentIdx + 1).join(' ') : undefined;
+      if (!command) continue;
+      crons.push({ id: hash(schedule + command), schedule, command, enabled: true, comment });
+    }
+  }
+  return crons;
+}
+
+function readCrontab() {
+  try {
+    const raw = execSync('crontab -l', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    return { raw, crons: parseCrontab(raw) };
+  } catch {
+    return { raw: '', crons: [] };
+  }
+}
+
+function writeCrontab(crons) {
+  const lines = crons.map(({ schedule, command, enabled, comment }) => {
+    const line = `${schedule} ${command}${comment ? ' # ' + comment : ''}`;
+    return enabled ? line : `# ${line}`;
+  });
+  execSync('crontab -', { input: lines.join('\n') + '\n', encoding: 'utf8' });
+}
+
 // ── Server ────────────────────────────────────────────────
 
 const server = createServer(async (req, res) => {
@@ -87,6 +149,28 @@ const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, corsHeaders());
     return res.end();
+  }
+
+  // GET /api/crons — lista system crontab (requer auth)
+  if (url.pathname === '/api/crons' && req.method === 'GET') {
+    if (!authOk(req)) return json(res, 401, { error: 'Unauthorized' });
+    const { crons } = readCrontab();
+    return json(res, 200, { crons });
+  }
+
+  // PUT /api/crons — atualiza system crontab (requer auth)
+  if (url.pathname === '/api/crons' && req.method === 'PUT') {
+    if (!authOk(req)) return json(res, 401, { error: 'Unauthorized' });
+    try {
+      const body    = await readBody(req);
+      const { crons } = JSON.parse(body);
+      writeCrontab(crons);
+      const { crons: updated } = readCrontab();
+      return json(res, 200, { crons: updated });
+    } catch (err) {
+      console.error('[tasks-api] Erro ao gravar crontab:', err.message);
+      return json(res, 500, { error: err.message });
+    }
   }
 
   // GET /api/rates — público (sem autenticação, dados públicos)

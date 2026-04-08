@@ -15,6 +15,7 @@ import {
   Settings,
   RefreshCw,
   Users,
+  CalendarClock,
 } from 'lucide-react';
 import { useSyncStatus } from '../context/SyncStatusContext';
 
@@ -42,6 +43,12 @@ const NAV_ITEMS = [
     path: '/telemetry',
     icon: Activity,
     description: 'Métricas e Clima',
+  },
+  {
+    label: 'Tarefas Agendadas',
+    path: '/scheduled',
+    icon: CalendarClock,
+    description: 'Crontab & OpenClaw',
   },
 ];
 
