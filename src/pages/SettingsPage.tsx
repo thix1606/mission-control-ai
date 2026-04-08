@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { Settings, Eye, EyeOff, Wifi, WifiOff, Save, RotateCcw, Fingerprint, Trash2, ShieldAlert } from 'lucide-react';
+import { Settings, Eye, EyeOff, Wifi, WifiOff, Save, RotateCcw, Fingerprint, Trash2, ShieldAlert, RefreshCw, CheckCircle, AlertCircle, GitCommit } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { testConnection } from '../services/openclaw';
@@ -21,6 +21,10 @@ export function SettingsPage() {
   const [testResult, setTestResult] = useState<TestResult>(null);
   const [testingTasks, setTestingTasks] = useState(false);
   const [testTasksResult, setTestTasksResult] = useState<TestResult>(null);
+
+  type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'outdated' | 'error';
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
+  const [latestCommit, setLatestCommit] = useState<{ sha: string; message: string; date: string } | null>(null);
 
   const isDirty = baseUrl !== config.baseUrl || token !== config.token;
 
@@ -49,6 +53,26 @@ export function SettingsPage() {
     setToken(config.token);
     setTestResult(null);
     setTestTasksResult(null);
+  }
+
+  async function handleCheckUpdates() {
+    setUpdateStatus('checking');
+    setLatestCommit(null);
+    try {
+      const res = await fetch(
+        'https://api.github.com/repos/thix1606/mission-control-ai/commits/main',
+        { headers: { Accept: 'application/vnd.github.v3+json' } },
+      );
+      if (!res.ok) throw new Error(`GitHub API: HTTP ${res.status}`);
+      const data = await res.json();
+      const sha     = (data.sha as string).slice(0, 7);
+      const message = (data.commit?.message as string ?? '').split('\n')[0];
+      const date    = new Date(data.commit?.author?.date ?? '').toLocaleString('pt-BR');
+      setLatestCommit({ sha, message, date });
+      setUpdateStatus(__APP_COMMIT__ === sha ? 'up-to-date' : 'outdated');
+    } catch {
+      setUpdateStatus('error');
+    }
   }
 
   async function handleTestTasks() {
@@ -185,6 +209,58 @@ export function SettingsPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Atualizações */}
+        <div className="pt-4 border-t border-gray-800">
+          <div className="flex items-center gap-2 mb-3">
+            <RefreshCw className="w-4 h-4 text-gray-500" />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Atualizações</h3>
+          </div>
+
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <GitCommit className="w-3.5 h-3.5" />
+              <span>Versão instalada:</span>
+              <code className="font-mono text-gray-400">{__APP_COMMIT__}</code>
+            </div>
+            <button
+              onClick={handleCheckUpdates}
+              disabled={updateStatus === 'checking'}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors ml-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} />
+              {updateStatus === 'checking' ? 'Verificando...' : 'Checar atualizações'}
+            </button>
+          </div>
+
+          {updateStatus === 'up-to-date' && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+              Você está na versão mais recente.
+            </div>
+          )}
+
+          {updateStatus === 'outdated' && latestCommit && (
+            <div className="p-2.5 rounded-lg text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 space-y-1">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-yellow-400" />
+                <span className="font-medium">Nova versão disponível</span>
+              </div>
+              <div className="pl-5 space-y-0.5 text-yellow-400/70">
+                <p><code className="text-yellow-300">{latestCommit.sha}</code> — {latestCommit.message}</p>
+                <p>{latestCommit.date}</p>
+                <p className="mt-1.5 text-yellow-400/50">O servidor será atualizado automaticamente pelo CI/CD após o próximo push.</p>
+              </div>
+            </div>
+          )}
+
+          {updateStatus === 'error' && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg text-xs bg-red-500/10 border border-red-500/30 text-red-400">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              Não foi possível verificar atualizações. Verifique sua conexão.
+            </div>
+          )}
         </div>
 
         {/* Identidade do dispositivo */}
