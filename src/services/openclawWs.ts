@@ -659,7 +659,6 @@ export async function readAgentFile(
   return openClawSession(config, async (rpc) => {
     try {
       const res = await rpc('agents.files.get', { agentId, name: path });
-      console.log(`[agents.files.get] agentId=${agentId} name=${path} →`, JSON.stringify(res));
       return res?.file?.content ?? res?.content ?? res?.data ?? null;
     } catch (e: any) {
       console.warn(`[agents.files.get] erro agentId=${agentId} name=${path}:`, e?.message);
@@ -686,20 +685,40 @@ export async function fetchOpenClawCrons(
 ): Promise<import('../types').OpenClawCron[]> {
   return openClawSession(config, async (rpc) => {
     const raw = await rpc('cron.list', {}).catch(() => null);
+    // O cron.list retorna { jobs: [...] }
     const list: any[] = Array.isArray(raw)
       ? raw
-      : (raw?.crons ?? raw?.list ?? raw?.items ?? []);
+      : (raw?.jobs ?? raw?.crons ?? raw?.list ?? raw?.items ?? []);
+
+    function resolveSchedule(c: any): string | undefined {
+      const s = c.schedule;
+      if (!s) return undefined;
+      if (typeof s === 'string') return s;
+      if (typeof s === 'object') {
+        if (s.kind === 'cron' && s.expr) return s.expr;
+        if (s.kind === 'every' && s.everyMs) {
+          const ms = s.everyMs as number;
+          if (ms % 86400000 === 0) return `every ${ms / 86400000}d`;
+          if (ms % 3600000  === 0) return `every ${ms / 3600000}h`;
+          if (ms % 60000   === 0) return `every ${ms / 60000}m`;
+          return `every ${ms}ms`;
+        }
+        if (s.kind === 'at') return `at ${new Date(s.atMs ?? 0).toISOString()}`;
+      }
+      return undefined;
+    }
+
     return list.map((c: any, i: number) => ({
       id:           String(c.id ?? c.name ?? `cron-${i}`),
       name:         c.name     ?? undefined,
-      schedule:     c.schedule ?? c.cron    ?? c.expr    ?? undefined,
-      command:      c.command  ?? c.cmd     ?? c.handler ?? undefined,
+      schedule:     resolveSchedule(c),
+      command:      c.payload?.message?.slice(0, 80) ?? c.command ?? c.cmd ?? c.handler ?? undefined,
       enabled:      c.enabled  ?? c.active  ?? true,
-      lastRun:      c.lastRun  ?? c.last_run  ?? undefined,
-      nextRun:      c.nextRun  ?? c.next_run  ?? undefined,
-      failCount:    c.failCount    ?? c.failures ?? 0,
-      runCount:     c.runCount     ?? c.runs     ?? 0,
-      avgDurationMs: c.avgDurationMs ?? c.avgDuration ?? undefined,
+      lastRun:      c.state?.lastRunAtMs  ? new Date(c.state.lastRunAtMs).toISOString()  : undefined,
+      nextRun:      c.state?.nextRunAtMs  ? new Date(c.state.nextRunAtMs).toISOString()  : undefined,
+      failCount:    c.state?.consecutiveErrors ?? c.failCount ?? 0,
+      runCount:     c.runCount ?? 0,
+      avgDurationMs: c.state?.lastDurationMs ?? c.avgDurationMs ?? undefined,
     }));
   });
 }
@@ -724,9 +743,10 @@ export async function fetchAgentSessions(
 
     const lId   = agentId.toLowerCase();
     const lName = agentName.toLowerCase();
+    // sessions.usage pode retornar name = agentId ou sessionKey (ex: "agent:transinha:telegram:...")
     const filtered = all.filter((s: any) => {
-      const sn = String(s.name ?? '').toLowerCase();
-      return sn === lId || sn === lName;
+      const sn = String(s.name ?? s.sessionKey ?? '').toLowerCase();
+      return sn === lId || sn === lName || sn.startsWith(`agent:${lId}:`) || sn.startsWith(`agent:${lName}:`);
     });
 
     const sessions = filtered.map((s: any) => ({

@@ -48,6 +48,7 @@ function DroppableColumn({
   isOver,
   onAssign,
   onDelete,
+  onUpdate,
 }: {
   col: typeof COLUMNS[number];
   tasks: Task[];
@@ -55,6 +56,7 @@ function DroppableColumn({
   isOver: boolean;
   onAssign: (taskId: string, agentId: string | null, agentName: string | null) => void;
   onDelete: (taskId: string) => void;
+  onUpdate: (taskId: string, patch: Partial<Omit<Task, 'id' | 'createdAt'>>) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: col.status });
 
@@ -88,6 +90,7 @@ function DroppableColumn({
               agents={agents}
               onAssign={(agentId, agentName) => onAssign(task.id, agentId, agentName)}
               onDelete={() => onDelete(task.id)}
+              onUpdate={(patch) => onUpdate(task.id, patch)}
             />
           ))}
         </SortableContext>
@@ -119,7 +122,7 @@ const EMPTY_FORM: NewTaskForm = {
 export function OrchestrationPage() {
   const { config } = useOpenClawConfig();
   const { agents } = useOpenClawData(config);
-  const { tasks, loading, addTask, moveTask, assignAgent, deleteTask } = useTaskData(config);
+  const { tasks, loading, addTask, moveTask, assignAgent, deleteTask, updateTask } = useTaskData(config);
 
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
 
@@ -221,6 +224,7 @@ export function OrchestrationPage() {
               isOver={overColumn === col.status}
               onAssign={assignAgent}
               onDelete={deleteTask}
+              onUpdate={updateTask}
             />
           ))}
         </div>

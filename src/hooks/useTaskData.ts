@@ -13,6 +13,7 @@ interface UseTaskDataReturn {
   moveTask: (taskId: string, status: TaskStatus) => Promise<void>;
   assignAgent: (taskId: string, agentId: string | null, agentName: string | null) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
+  updateTask: (taskId: string, patch: Partial<Omit<Task, 'id' | 'createdAt'>>) => Promise<void>;
 }
 
 export function useTaskData(config: OpenClawConfig): UseTaskDataReturn {
@@ -70,5 +71,12 @@ export function useTaskData(config: OpenClawConfig): UseTaskDataReturn {
     await persist(tasks.filter((t) => t.id !== taskId));
   }, [tasks, persist]);
 
-  return { tasks, loading, addTask, moveTask, assignAgent, deleteTask };
+  const updateTask = useCallback(async (
+    taskId: string,
+    patch: Partial<Omit<Task, 'id' | 'createdAt'>>,
+  ) => {
+    await persist(tasks.map((t) => t.id === taskId ? { ...t, ...patch } : t));
+  }, [tasks, persist]);
+
+  return { tasks, loading, addTask, moveTask, assignAgent, deleteTask, updateTask };
 }
