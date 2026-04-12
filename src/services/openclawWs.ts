@@ -164,8 +164,12 @@ function parseChannels(cfg: any, health?: any): Channel[] {
 
       // O OpenClaw deriva "em execução" de probe.ok (Telegram) ou linked (WhatsApp)
       const effectiveRunning   = rawRunning || probeOk || linked || false;
-      // "conectado" para WhatsApp = linked (sessão autenticada = conectado)
-      const effectiveConnected = rawConnected || linked || undefined;
+      // "conectado": usa o valor explícito da API quando disponível; caso contrário usa linked como fallback
+      // (evita que linked=true sobrescreva um connected=false reportado pela API)
+      const rawConnectedExplicit = ac.connected ?? hc.connected;
+      const effectiveConnected = rawConnectedExplicit !== undefined
+        ? rawConnectedExplicit
+        : (linked !== undefined ? linked : undefined);
 
       const statusDetails: ChannelStatusDetails = {
         configured,
