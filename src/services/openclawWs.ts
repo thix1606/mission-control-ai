@@ -487,32 +487,30 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
   configuredModels: ConfiguredModel[];
 }> {
   return openClawSession(config, async (rpc, on) => {
-    let healthResolve: ((p: any) => void) | null = null;
-    const healthPromise = new Promise<any>(res => { healthResolve = res; });
-    on('health', (payload) => healthResolve?.(payload));
+    // Coleta o evento de health mais recente dentro da janela de espera.
+    // O OpenClaw envia o evento logo ao conectar (pode ser stale) e novamente
+    // quando o estado muda (ex: WhatsApp termina de se conectar). Usamos o último.
+    let latestHealth: any = null;
+    on('health', (payload) => { latestHealth = payload; });
 
-    // Busca config, modelos e health via RPC em paralelo
-    // health.get retorna dados frescos; o evento pushed pode estar desatualizado
-    const [configData, modelsRaw, healthRpc] = await Promise.all([
+    // Busca config, modelos em paralelo
+    const [configData, modelsRaw] = await Promise.all([
       rpc('config.get'),
       rpc('models.list').catch(() => null),
-      rpc('health.get', {}).catch(() => null),
     ]);
 
-    // Aguarda evento de health como fallback (caso health.get não exista no servidor)
-    const healthEvent = await Promise.race([
-      healthPromise,
-      new Promise<null>(res => setTimeout(() => res(null), 5000)),
-    ]);
+    // Aguarda o primeiro evento de health (até 5s), depois dá 2s extras para
+    // capturar uma versão mais atualizada que o servidor possa enviar logo após.
+    const deadline = Date.now() + 5000;
+    while (latestHealth === null && Date.now() < deadline) {
+      await new Promise(res => setTimeout(res, 100));
+    }
+    if (latestHealth !== null) {
+      await new Promise(res => setTimeout(res, 2000));
+    }
 
-    // Prefere health.get (mais recente) sobre o evento pushed (pode ser stale)
-    const health = healthRpc ?? healthEvent;
-
-    // DEBUG TEMP
-    console.log('[fetchViaWebSocket] healthRpc=', JSON.stringify(healthRpc));
-    console.log('[fetchViaWebSocket] healthEvent.channels.whatsapp=', JSON.stringify(healthEvent?.channels?.whatsapp));
+    const health = latestHealth;
     const cfg    = configData?.parsed ?? configData;
-    console.log('[fetchViaWebSocket] cfg.channels.whatsapp=', JSON.stringify(cfg?.channels?.whatsapp));
     const agents = parseAgents(cfg, health);
 
     // Complementa a detecção de providers com os modelos já em uso pelos agentes
