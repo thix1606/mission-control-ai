@@ -155,6 +155,8 @@ function parseChannels(cfg: any, health?: any): Channel[] {
     const accounts: Record<string, any> = hc.accounts ?? { default: hc };
 
     for (const [accountId, ac] of Object.entries(accounts) as [string, any][]) {
+      // DEBUG TEMP
+      console.log('[parseChannels]', key, accountId, JSON.stringify({ hc, ac }, null, 2));
       // Campos brutos — podem estar no sub-objeto de conta (ac) ou no nível do canal (hc)
       const rawRunning   = ac.running   ?? hc.running   ?? false;
       const linked       = ac.linked    ?? hc.linked    ?? undefined;
