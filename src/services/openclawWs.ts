@@ -155,8 +155,6 @@ function parseChannels(cfg: any, health?: any): Channel[] {
     const accounts: Record<string, any> = hc.accounts ?? { default: hc };
 
     for (const [accountId, ac] of Object.entries(accounts) as [string, any][]) {
-      // DEBUG TEMP
-      console.log('[parseChannels]', key, accountId, JSON.stringify({ hc, ac }, null, 2));
       // Campos brutos — podem estar no sub-objeto de conta (ac) ou no nível do canal (hc)
       const rawRunning   = ac.running   ?? hc.running   ?? false;
       const linked       = ac.linked    ?? hc.linked    ?? undefined;
@@ -493,16 +491,22 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
     const healthPromise = new Promise<any>(res => { healthResolve = res; });
     on('health', (payload) => healthResolve?.(payload));
 
-    // Busca config e modelos em paralelo na mesma sessão autenticada
-    const [configData, modelsRaw] = await Promise.all([
+    // Busca config, modelos e health via RPC em paralelo
+    // health.get retorna dados frescos; o evento pushed pode estar desatualizado
+    const [configData, modelsRaw, healthRpc] = await Promise.all([
       rpc('config.get'),
       rpc('models.list').catch(() => null),
+      rpc('health.get', {}).catch(() => null),
     ]);
 
-    const health = await Promise.race([
+    // Aguarda evento de health como fallback (caso health.get não exista no servidor)
+    const healthEvent = await Promise.race([
       healthPromise,
       new Promise<null>(res => setTimeout(() => res(null), 5000)),
     ]);
+
+    // Prefere health.get (mais recente) sobre o evento pushed (pode ser stale)
+    const health = healthRpc ?? healthEvent;
 
     const cfg    = configData?.parsed ?? configData;
     const agents = parseAgents(cfg, health);
