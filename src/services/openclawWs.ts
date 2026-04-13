@@ -508,7 +508,11 @@ export async function fetchViaWebSocket(config: OpenClawConfig): Promise<{
     // Prefere health.get (mais recente) sobre o evento pushed (pode ser stale)
     const health = healthRpc ?? healthEvent;
 
+    // DEBUG TEMP
+    console.log('[fetchViaWebSocket] healthRpc=', JSON.stringify(healthRpc));
+    console.log('[fetchViaWebSocket] healthEvent.channels.whatsapp=', JSON.stringify(healthEvent?.channels?.whatsapp));
     const cfg    = configData?.parsed ?? configData;
+    console.log('[fetchViaWebSocket] cfg.channels.whatsapp=', JSON.stringify(cfg?.channels?.whatsapp));
     const agents = parseAgents(cfg, health);
 
     // Complementa a detecção de providers com os modelos já em uso pelos agentes
