@@ -163,12 +163,18 @@ function parseChannels(cfg: any, health?: any): Channel[] {
 
       // O OpenClaw deriva "em execução" de probe.ok (Telegram) ou linked (WhatsApp)
       const effectiveRunning   = rawRunning || probeOk || linked || false;
-      // "conectado": usa o valor explícito da API quando disponível; caso contrário usa linked como fallback
-      // (evita que linked=true sobrescreva um connected=false reportado pela API)
+
+      // "conectado": o campo `connected` do evento de health é sempre false para WhatsApp
+      // (é enviado antes da sessão se estabelecer de fato). O admin do OpenClaw usa `linked`
+      // como indicador de sessão ativa. Usamos a mesma lógica, com `lastError` como override:
+      // se houver erro explícito na sessão → não conectado; caso contrário → segue linked.
+      const lastError          = ac.lastError ?? hc.lastError;
       const rawConnectedExplicit = ac.connected ?? hc.connected;
-      const effectiveConnected = rawConnectedExplicit !== undefined
-        ? rawConnectedExplicit
-        : (linked !== undefined ? linked : undefined);
+      const effectiveConnected =
+        lastError != null   ? false                                           // erro explícito
+        : rawConnectedExplicit === true ? true                                // sinal positivo da API
+        : linked !== undefined ? linked                                       // fallback: linked
+        : undefined;
 
       const statusDetails: ChannelStatusDetails = {
         configured,
