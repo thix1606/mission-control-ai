@@ -171,6 +171,31 @@ Esses dois não precisam de alteração para produção — já consomem APIs re
 
 ---
 
+## Integração com o OpenClaw
+
+O app fala com o gateway do OpenClaw por WebSocket (`src/services/openclawWs.ts`), usando o
+protocolo nativo do gateway e identidade de dispositivo Ed25519.
+
+**Requisitos no servidor do OpenClaw:**
+
+| Requisito | Detalhe |
+|-----------|---------|
+| Protocolo WS | O app envia `minProtocol`/`maxProtocol` = **4** (exigido pelo gateway desde 2026.8.x). Versão antiga do app retorna `PROTOCOL_MISMATCH`. |
+| Origem permitida | O gateway valida o header `Origin` do browser. Adicione a URL de onde o Mission Control é servido em `gateway.controlUi.allowedOrigins`, ex: `["https://192.168.1.100:3080"]`. Sem isso o gateway responde `CONTROL_UI_ORIGIN_NOT_ALLOWED`. |
+| HTTPS | Necessário para o Web Crypto (identidade do dispositivo). |
+| Pareamento | Na primeira conexão, aprove o dispositivo no painel do OpenClaw. |
+| Proxy reverso | Se o gateway for exposto num prefixo (ex: `/openclaw/`), o app normaliza a URL com barra final, pois o Nginx redireciona `/openclaw` → `/openclaw/` e WebSocket não segue redirecionamento. |
+
+Exemplo de ajuste no servidor:
+
+```bash
+openclaw config get gateway.controlUi.allowedOrigins
+openclaw config set gateway.controlUi.allowedOrigins '["https://192.168.1.100:3080"]'
+openclaw gateway restart
+```
+
+---
+
 ## Stack Tecnológica
 
 | Tecnologia | Versão | Uso |
