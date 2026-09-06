@@ -75,6 +75,13 @@ async function getOrCreateKeyPair(): Promise<{
   return { privateKey: keyPair.privateKey, publicKeyStr, deviceId };
 }
 
+// Normalização igual à do gateway (normalizeDeviceMetadataForAuth):
+// trim + lowercase ASCII. O gateway compara a assinatura byte a byte.
+function normalizeDeviceMetadata(value?: string | null): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32));
+}
+
 async function signPayload(
   privateKey: CryptoKey,
   payload: {
@@ -86,11 +93,15 @@ async function signPayload(
     signedAtMs: number;
     token: string | null;
     nonce: string;
+    platform?: string | null;
+    deviceFamily?: string | null;
   },
 ): Promise<string> {
-  // Serialização canônica v2: campos unidos por "|", scopes unidos por ","
+  // Serialização canônica v3 (protocolo 4): campos unidos por "|", scopes por ",",
+  // com platform e deviceFamily normalizados no final. O gateway ainda aceita v2,
+  // mas v3 é o formato usado pelo Control UI oficial.
   const canonical = [
-    'v2',
+    'v3',
     payload.deviceId,
     payload.clientId,
     payload.clientMode,
@@ -99,6 +110,8 @@ async function signPayload(
     String(payload.signedAtMs),
     payload.token ?? '',
     payload.nonce,
+    normalizeDeviceMetadata(payload.platform),
+    normalizeDeviceMetadata(payload.deviceFamily),
   ].join('|');
   const data = new TextEncoder().encode(canonical);
   const sig  = await crypto.subtle.sign('Ed25519', privateKey, data);
@@ -234,8 +247,40 @@ interface WsMessage {
   event?: string;
 }
 
+// Versão do protocolo WS do gateway (packages/gateway-protocol/src/version.ts no OpenClaw).
+const GATEWAY_PROTOCOL_VERSION = 4;
+
 function toWsUrl(baseUrl: string): string {
-  return baseUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://');
+  const ws = baseUrl.trim().replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://');
+  // Quando o gateway está atrás de um prefixo (ex: /openclaw via Nginx), o Nginx
+  // responde 301 para /openclaw/ quando a URL vem sem a barra final — e WebSocket
+  // não segue redirecionamentos. Normaliza para sempre terminar com "/".
+  try {
+    const u = new URL(ws);
+    if (u.pathname !== '/' && !u.pathname.endsWith('/')) u.pathname += '/';
+    return u.toString();
+  } catch {
+    return ws;
+  }
+}
+
+// Traduz erros do handshake `connect` em mensagens acionáveis.
+function describeConnectError(err: any): string {
+  const code: string | undefined = err?.details?.code ?? err?.code;
+  const msg: string = err?.message ?? 'Falha na autenticação com o OpenClaw.';
+  switch (code) {
+    case 'PROTOCOL_MISMATCH':
+      return `Versão de protocolo incompatível (app: ${GATEWAY_PROTOCOL_VERSION}, gateway espera: ${err?.details?.expectedProtocol ?? '?'}). Atualize o Mission Control.`;
+    case 'CONTROL_UI_ORIGIN_NOT_ALLOWED':
+      return `Origem ${window.location.origin} não autorizada pelo gateway. No servidor do OpenClaw, adicione "${window.location.origin}" em gateway.controlUi.allowedOrigins e reinicie o gateway.`;
+    case 'CONTROL_UI_DEVICE_IDENTITY_REQUIRED':
+      return 'O gateway exige identidade de dispositivo. Acesse o Mission Control via HTTPS.';
+    case 'PAIRING_REQUIRED':
+    case 'DEVICE_PAIRING_REQUIRED':
+      return `Dispositivo aguardando aprovação. Aprove-o no painel do OpenClaw (Dispositivos) e tente novamente. (${msg})`;
+    default:
+      return msg;
+  }
 }
 
 // ── Sessão autenticada (helper interno) ───────────────────
@@ -293,18 +338,24 @@ async function openClawSession<T>(
 
       if (msg.type === 'event' && msg.event === 'connect.challenge') {
         const nonce      = msg.payload?.nonce as string;
-        const signedAtMs = Date.now();
+        // O gateway envia `ts` no challenge e espera que device.signedAt use esse
+        // valor (evita rejeição por relógio do cliente fora de sincronia).
+        const challengeTs = msg.payload?.ts;
+        const signedAtMs = typeof challengeTs === 'number' ? challengeTs : Date.now();
         const clientId   = 'openclaw-control-ui';
         const clientMode = 'ui';
+        const platform   = navigator.platform || 'web';
         const role       = 'operator';
         const scopes     = ['operator.admin', 'operator.read', 'operator.write', 'operator.approvals', 'operator.pairing'];
 
-        const sigPayload = { deviceId, clientId, clientMode, role, scopes, signedAtMs, token: config.token ?? null, nonce };
+        const sigPayload = { deviceId, clientId, clientMode, role, scopes, signedAtMs, token: config.token ?? null, nonce, platform };
         const signature  = await signPayload(privateKey, sigPayload);
 
         const connectParams = {
-          minProtocol: 3, maxProtocol: 3,
-          client: { id: clientId, version: 'control-ui', platform: navigator.platform, mode: clientMode, instanceId: crypto.randomUUID() },
+          // Protocolo 4: exigido pelo gateway desde OpenClaw 2026.8.x
+          // (MIN_CLIENT_PROTOCOL_VERSION = 4). Versão 3 retorna PROTOCOL_MISMATCH.
+          minProtocol: GATEWAY_PROTOCOL_VERSION, maxProtocol: GATEWAY_PROTOCOL_VERSION,
+          client: { id: clientId, version: 'control-ui', platform, mode: clientMode, instanceId: crypto.randomUUID() },
           role, scopes, caps: ['tool-events'],
           auth:   { token: config.token, deviceToken: storedDeviceToken ?? undefined },
           device: { id: deviceId, publicKey: publicKeyStr, nonce, signedAt: signedAtMs, signature },
@@ -325,7 +376,7 @@ async function openClawSession<T>(
         } catch (e: any) {
           clearTimeout(timeout);
           ws.close();
-          reject(new Error(e?.message ?? 'Falha na autenticação com o OpenClaw.'));
+          reject(new Error(describeConnectError(e)));
         }
         return;
       }
@@ -335,7 +386,13 @@ async function openClawSession<T>(
         if (handler) {
           pending.delete(msg.id);
           if (msg.ok) handler.resolve(msg.payload);
-          else handler.reject(new Error(msg.error?.message ?? 'Erro RPC'));
+          else {
+            // Preserva code/details do gateway para diagnóstico (ex: PROTOCOL_MISMATCH)
+            const e: any = new Error(msg.error?.message ?? 'Erro RPC');
+            e.code    = msg.error?.code;
+            e.details = (msg.error as any)?.details;
+            handler.reject(e);
+          }
         }
       }
     };
