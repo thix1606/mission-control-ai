@@ -243,8 +243,14 @@ interface WsMessage {
   params?: any;
   ok?: boolean;
   payload?: any;
-  error?: { code?: string; message: string };
+  error?: { code?: string; message: string; details?: Record<string, unknown> };
   event?: string;
+}
+
+// Erro de RPC com code/details do gateway preservados para diagnóstico.
+interface GatewayRpcError extends Error {
+  code?: string;
+  details?: Record<string, unknown>;
 }
 
 // Versão do protocolo WS do gateway (packages/gateway-protocol/src/version.ts no OpenClaw).
@@ -265,12 +271,13 @@ function toWsUrl(baseUrl: string): string {
 }
 
 // Traduz erros do handshake `connect` em mensagens acionáveis.
-function describeConnectError(err: any): string {
-  const code: string | undefined = err?.details?.code ?? err?.code;
-  const msg: string = err?.message ?? 'Falha na autenticação com o OpenClaw.';
+function describeConnectError(err: unknown): string {
+  const e = (err ?? {}) as GatewayRpcError;
+  const code = (e.details?.code as string | undefined) ?? e.code;
+  const msg = e.message ?? 'Falha na autenticação com o OpenClaw.';
   switch (code) {
     case 'PROTOCOL_MISMATCH':
-      return `Versão de protocolo incompatível (app: ${GATEWAY_PROTOCOL_VERSION}, gateway espera: ${err?.details?.expectedProtocol ?? '?'}). Atualize o Mission Control.`;
+      return `Versão de protocolo incompatível (app: ${GATEWAY_PROTOCOL_VERSION}, gateway espera: ${e.details?.expectedProtocol ?? '?'}). Atualize o Mission Control.`;
     case 'CONTROL_UI_ORIGIN_NOT_ALLOWED':
       return `Origem ${window.location.origin} não autorizada pelo gateway. No servidor do OpenClaw, adicione "${window.location.origin}" em gateway.controlUi.allowedOrigins e reinicie o gateway.`;
     case 'CONTROL_UI_DEVICE_IDENTITY_REQUIRED':
@@ -388,9 +395,9 @@ async function openClawSession<T>(
           if (msg.ok) handler.resolve(msg.payload);
           else {
             // Preserva code/details do gateway para diagnóstico (ex: PROTOCOL_MISMATCH)
-            const e: any = new Error(msg.error?.message ?? 'Erro RPC');
+            const e: GatewayRpcError = new Error(msg.error?.message ?? 'Erro RPC');
             e.code    = msg.error?.code;
-            e.details = (msg.error as any)?.details;
+            e.details = msg.error?.details;
             handler.reject(e);
           }
         }
