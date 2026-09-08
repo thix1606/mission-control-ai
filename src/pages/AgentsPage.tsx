@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, ChevronRight, Cpu, Clock, Activity } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
+import { AuthProfileBadge } from '../components/AuthProfileBadge';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { useOpenClawData } from '../hooks/useOpenClawData';
 import { useTaskData } from '../hooks/useTaskData';
@@ -76,7 +77,10 @@ export function AgentsPage() {
               </div>
 
               {/* Modelo */}
-              <p className="text-xs text-gray-500 font-mono mb-4 pl-4 truncate">{agent.model}</p>
+              <p className="text-xs text-gray-500 font-mono mb-4 pl-4 truncate flex items-center gap-2">
+                {agent.model}
+                <AuthProfileBadge authProfile={agent.authProfile} />
+              </p>
 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-2 mb-4">

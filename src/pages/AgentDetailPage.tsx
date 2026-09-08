@@ -15,6 +15,7 @@ import { useTaskData } from '../hooks/useTaskData';
 import { useAgentSessions } from '../hooks/useAgentSessions';
 import type { Agent, TaskStatus } from '../types';
 import { AgentFiles } from '../components/AgentFiles';
+import { AuthProfileBadge } from '../components/AuthProfileBadge';
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -120,7 +121,10 @@ export function AgentDetailPage() {
               <span className="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full">padrão</span>
             )}
           </div>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">{agent.model}</p>
+          <p className="text-xs text-gray-500 font-mono mt-0.5 flex items-center gap-2">
+            {agent.model}
+            <AuthProfileBadge authProfile={agent.authProfile} />
+          </p>
         </div>
       </div>
 
@@ -236,7 +240,10 @@ export function AgentDetailPage() {
 
             {!editingModel ? (
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-300 font-mono">{agent.model}</p>
+                <p className="text-sm text-gray-300 font-mono flex items-center gap-2">
+                  {agent.model}
+                  <AuthProfileBadge authProfile={agent.authProfile} />
+                </p>
                 <button
                   onClick={() => { setEditingModel(true); setPendingModel(agent.model); setConfirming(false); }}
                   className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"

@@ -9,7 +9,8 @@ export type TaskStatus = 'queue' | 'processing' | 'reviewing' | 'done' | 'failed
 export interface Agent {
   id: string;
   name: string;
-  model: string;
+  model: string;            // ref do modelo sem sufixo, ex: "anthropic/claude-opus-5"
+  authProfile?: string | null; // perfil de auth pinado no ref (sufixo "@anthropic:default"), se houver
   status: AgentStatus;
   isDefault: boolean;
   heartbeat: string | null; // ex: "30m" ou null

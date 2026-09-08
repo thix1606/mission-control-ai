@@ -185,6 +185,7 @@ protocolo nativo do gateway e identidade de dispositivo Ed25519.
 | HTTPS | Necessário para o Web Crypto (identidade do dispositivo). |
 | Pareamento | Na primeira conexão, aprove o dispositivo no painel do OpenClaw. |
 | Proxy reverso | Se o gateway for exposto num prefixo (ex: `/openclaw/`), o app normaliza a URL com barra final, pois o Nginx redireciona `/openclaw` → `/openclaw/` e WebSocket não segue redirecionamento. |
+| Perfil de auth pinado | O OpenClaw aceita `provider/modelo@perfil` (ex: `anthropic/claude-opus-5@anthropic:default`). Esse sufixo é a escolha explícita de credencial exigida para assinaturas (token/oauth) via Claude CLI. Ao trocar o modelo pelo app, o sufixo atual é preservado quando o provider é o mesmo, ou inferido a partir de `auth.profiles` quando o novo provider tem perfil token/oauth. O badge `@perfil` na lista de agentes indica a pinagem. |
 
 Exemplo de ajuste no servidor:
 
