@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../components/StatusBadge';
 import { PageHeader } from '../components/PageHeader';
+import { AuthProfileBadge } from '../components/AuthProfileBadge';
 import { useOpenClawConfig } from '../hooks/useOpenClawConfig';
 import { useOpenClawData } from '../hooks/useOpenClawData';
 import type { ConfiguredModel } from '../types';
@@ -291,6 +292,7 @@ export function StatusPage() {
                           disabled={configuredModels.length === 0}
                         >
                           <span>{agent.model}</span>
+                          <AuthProfileBadge authProfile={agent.authProfile} />
                           <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                         </button>
                       )}

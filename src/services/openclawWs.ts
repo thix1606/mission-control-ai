@@ -118,6 +118,49 @@ async function signPayload(
   return base64url(new Uint8Array(sig));
 }
 
+// ── Refs de modelo com perfil de auth pinado ───────────────
+// O OpenClaw aceita "provider/modelo@perfil" (ex: "anthropic/claude-opus-5@anthropic:default").
+// O sufixo é a escolha explícita de credencial que o backend claude-cli exige para
+// repassar um token de assinatura ao Claude Code; sem ele o agente cai em "Not logged in".
+
+export function splitModelRef(ref: string): { model: string; authProfile: string | null } {
+  const at = ref.indexOf('@');
+  if (at === -1) return { model: ref, authProfile: null };
+  return { model: ref.slice(0, at), authProfile: ref.slice(at + 1) || null };
+}
+
+export function joinModelRef(model: string, authProfile: string | null | undefined): string {
+  return authProfile ? `${model}@${authProfile}` : model;
+}
+
+function rawAgentModel(a: unknown): string {
+  const model = (a as { model?: unknown } | undefined)?.model;
+  if (model && typeof model === 'object') {
+    return String((model as { primary?: unknown }).primary ?? '—');
+  }
+  return String(model ?? '—');
+}
+
+// Decide qual perfil pinar ao trocar o modelo de um agente:
+// 1. mantém o perfil atual se ele pertence ao mesmo provider do novo modelo;
+// 2. senão, pina "<provider>:default" quando a config declara esse perfil como
+//    token/oauth (assinatura), que é o caso que exige a escolha explícita;
+// 3. caso contrário, não pina nada (chave de API não precisa).
+export function resolveAuthProfileForModel(
+  newModel: string,
+  currentAuthProfile: string | null | undefined,
+  authProfiles: Record<string, { mode?: string } | undefined> | undefined,
+): string | null {
+  const provider = newModel.includes('/') ? newModel.slice(0, newModel.indexOf('/')) : '';
+  if (!provider) return null;
+  if (currentAuthProfile && currentAuthProfile.split(':')[0] === provider) return currentAuthProfile;
+  const candidates = Object.entries(authProfiles ?? {})
+    .filter(([id, p]) => id.split(':')[0] === provider && ['token', 'oauth'].includes(String(p?.mode ?? '')))
+    .map(([id]) => id);
+  if (candidates.length === 0) return null;
+  return candidates.includes(`${provider}:default`) ? `${provider}:default` : candidates[0];
+}
+
 // ── Parsing de resposta ────────────────────────────────────
 
 function parseAgents(cfg: any, health?: any): Agent[] {
@@ -134,10 +177,12 @@ function parseAgents(cfg: any, health?: any): Agent[] {
     const lastSeen = h.sessions?.recent?.[0]?.updatedAt
       ? new Date(h.sessions.recent[0].updatedAt).toLocaleString()
       : '—';
+    const { model, authProfile } = splitModelRef(rawAgentModel(a));
     return {
       id:             String(a.id ?? `agent-${i}`),
       name:           String(a.name ?? a.displayName ?? a.id ?? `Agente ${i + 1}`),
-      model:          String(typeof a.model === 'object' ? (a.model?.primary ?? '—') : (a.model ?? '—')),
+      model,
+      authProfile,
       status:         gatewayOnline ? 'online' : 'offline',
       isDefault:      h.isDefault ?? false,
       heartbeat:      h.heartbeat?.enabled ? (h.heartbeat.every ?? null) : null,
@@ -847,23 +892,33 @@ export async function fetchAgentSessions(
   });
 }
 
+// Troca o modelo de um agente preservando (ou inferindo) o perfil de auth pinado.
+// Retorna o ref efetivamente gravado, já com o sufixo "@perfil" quando aplicável.
 export async function updateAgentModel(
   config: OpenClawConfig,
   agentId: string,
   model: string,
-): Promise<void> {
-  await openClawSession(config, async (rpc) => {
+): Promise<{ model: string; authProfile: string | null; primary: string }> {
+  return openClawSession(config, async (rpc) => {
     // O OpenClaw exige o hash atual da config para prevenir conflitos de escrita
     const configData = await rpc('config.get');
     const baseHash: string = configData?.hash;
+    const cfg = configData?.parsed ?? configData;
+
+    const current = (cfg?.agents?.list ?? []).find((a: { id?: unknown }) => String(a?.id) === agentId);
+    const currentProfile = current ? splitModelRef(rawAgentModel(current)).authProfile : null;
+    const authProfile = resolveAuthProfileForModel(model, currentProfile, cfg?.auth?.profiles);
+    const primary = joinModelRef(model, authProfile);
 
     await rpc('config.patch', {
       baseHash,
       raw: JSON.stringify({
         agents: {
-          list: [{ id: agentId, model: { primary: model } }],
+          list: [{ id: agentId, model: { primary } }],
         },
       }),
     });
+
+    return { model, authProfile, primary };
   });
 }

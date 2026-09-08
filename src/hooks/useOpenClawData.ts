@@ -71,10 +71,10 @@ export function useOpenClawData(config: OpenClawConfig): OpenClawData {
     setModelUpdating(agentId);
     setModelUpdateError(null);
     try {
-      await updateAgentModelRpc(config, agentId, model);
-      // Atualiza o agente localmente para refletir imediatamente
+      const result = await updateAgentModelRpc(config, agentId, model);
+      // Atualiza o agente localmente para refletir imediatamente (inclui perfil pinado)
       setAgents((prev) =>
-        prev.map((a) => a.id === agentId ? { ...a, model } : a)
+        prev.map((a) => a.id === agentId ? { ...a, model: result.model, authProfile: result.authProfile } : a)
       );
     } catch (err: any) {
       setModelUpdateError(err?.message ?? 'Erro ao atualizar modelo.');
