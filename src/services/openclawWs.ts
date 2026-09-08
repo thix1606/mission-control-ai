@@ -161,10 +161,39 @@ export function resolveAuthProfileForModel(
   return candidates.includes(`${provider}:default`) ? `${provider}:default` : candidates[0];
 }
 
+// ── Cadastro de agentes na config ──────────────────────────
+// O OpenClaw persiste o cadastro canônico em `agents.entries` (mapa id → config).
+// `agents.list` é o formato legado, projeção interna que pode não vir no config.get.
+// Lemos os dois e normalizamos para uma lista com `id`.
+
+type ConfiguredAgent = { id: string } & Record<string, unknown>;
+
+export function configuredAgents(cfg: unknown): ConfiguredAgent[] {
+  const agents = (cfg as { agents?: { entries?: unknown; list?: unknown } } | undefined)?.agents;
+  const entries = agents?.entries;
+  if (entries && typeof entries === 'object' && !Array.isArray(entries)) {
+    return Object.entries(entries as Record<string, Record<string, unknown> | undefined>)
+      .map(([id, entry]) => ({ ...(entry ?? {}), id }));
+  }
+  const list = agents?.list;
+  if (Array.isArray(list)) {
+    return list
+      .filter((a): a is Record<string, unknown> => Boolean(a) && typeof a === 'object')
+      .map((a) => ({ ...a, id: String(a.id ?? '') }))
+      .filter((a) => a.id !== '');
+  }
+  return [];
+}
+
+function usesKeyedAgentRoster(cfg: unknown): boolean {
+  const entries = (cfg as { agents?: { entries?: unknown } } | undefined)?.agents?.entries;
+  return Boolean(entries && typeof entries === 'object' && !Array.isArray(entries));
+}
+
 // ── Parsing de resposta ────────────────────────────────────
 
 function parseAgents(cfg: any, health?: any): Agent[] {
-  const list: any[] = cfg?.agents?.list ?? [];
+  const list: any[] = configuredAgents(cfg);
   // health.agents contém info de sessões por agentId
   const healthMap: Record<string, any> = {};
   for (const h of (health?.agents ?? [])) {
@@ -198,8 +227,8 @@ function parseChannels(cfg: any, health?: any): Channel[] {
   const labels: Record<string, string> = health?.channelLabels ?? {};
   const bindings: any[] = cfg?.bindings ?? [];
   const agentNames: Record<string, string> = {};
-  for (const a of (cfg?.agents?.list ?? [])) {
-    agentNames[a.id] = a.name ?? a.id;
+  for (const a of configuredAgents(cfg)) {
+    agentNames[a.id] = String(a.name ?? a.id);
   }
 
   const result: Channel[] = [];
@@ -773,7 +802,7 @@ export async function listAgentIds(config: OpenClawConfig): Promise<string[]> {
   return openClawSession(config, async (rpc) => {
     const configData = await rpc('config.get');
     const cfg = configData?.parsed ?? configData;
-    return (cfg?.agents?.list ?? []).map((a: any) => String(a.id));
+    return configuredAgents(cfg).map((a) => a.id);
   });
 }
 
@@ -905,19 +934,18 @@ export async function updateAgentModel(
     const baseHash: string = configData?.hash;
     const cfg = configData?.parsed ?? configData;
 
-    const current = (cfg?.agents?.list ?? []).find((a: { id?: unknown }) => String(a?.id) === agentId);
+    const current = configuredAgents(cfg).find((a) => a.id === agentId);
     const currentProfile = current ? splitModelRef(rawAgentModel(current)).authProfile : null;
     const authProfile = resolveAuthProfileForModel(model, currentProfile, cfg?.auth?.profiles);
     const primary = joinModelRef(model, authProfile);
 
-    await rpc('config.patch', {
-      baseHash,
-      raw: JSON.stringify({
-        agents: {
-          list: [{ id: agentId, model: { primary } }],
-        },
-      }),
-    });
+    // Grava no mesmo formato que o servidor usa: cadastro canônico por id
+    // (agents.entries) ou o legado agents.list.
+    const patch = usesKeyedAgentRoster(cfg)
+      ? { agents: { entries: { [agentId]: { model: { primary } } } } }
+      : { agents: { list: [{ id: agentId, model: { primary } }] } };
+
+    await rpc('config.patch', { baseHash, raw: JSON.stringify(patch) });
 
     return { model, authProfile, primary };
   });
