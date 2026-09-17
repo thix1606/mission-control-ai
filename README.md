@@ -171,6 +171,30 @@ Esses dois não precisam de alteração para produção — já consomem APIs re
 
 ---
 
+## Deploy no host
+
+O CI (`.github/workflows/deploy.yml`) só faz o build e publica o artefato `dist`
+no GitHub Actions, com retenção de 7 dias. No host, o script
+[`scripts/auto-deploy-local.sh`](scripts/auto-deploy-local.sh) roda pelo cron a
+cada 2 minutos, baixa o artefato do último build bem-sucedido da `main` e publica
+em `/var/www/mission-control`.
+
+Garantias do script:
+
+- Só substitui o deploy atual depois de baixar e validar o build novo
+  (`index.html` e `assets/` presentes). Artefato expirado ou download com falha
+  mantém o site no ar e registra o erro no log.
+- Token do GitHub lido de `~/.config/mission-control/github-token` (chmod 600) ou
+  da variável `GITHUB_TOKEN`, nunca hardcoded.
+- Lock via `flock` evita execuções concorrentes.
+
+Instalação e crontab estão no cabeçalho do próprio script.
+
+> ⚠️ Como o artefato expira em 7 dias, um host que perder o deploy (disco, reinstalação)
+> depois desse prazo precisa de um push novo na `main` para gerar outro artefato.
+
+---
+
 ## Integração com o OpenClaw
 
 O app fala com o gateway do OpenClaw por WebSocket (`src/services/openclawWs.ts`), usando o
